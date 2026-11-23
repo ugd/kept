@@ -29440,3 +29440,7 @@ msgstr "يؤدي الحفظ هنا إلى تجاوز ملف إعدادات خا�
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "استخدم عنوان برنامج الوسيط الذي يعمل بالقرب من الطابعة. يجب أن يتمكن خادم Kept من الوصول إليه."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "الطباعة من المتصفح"

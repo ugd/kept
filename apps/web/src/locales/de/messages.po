@@ -29440,3 +29440,7 @@ msgstr "Beim Speichern hier wird die Konfigurationsdatei des Druckservers für d
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "Verwende die Adresse des Dienstes in der Nähe des Druckers. Der Kept-Server muss ihn erreichen können."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "Im Browser drucken"

@@ -6,10 +6,11 @@ import { capturePaths } from '@/api/capture/paths';
 import type { LabelBatch, LabelPrintFormat } from '@/api/capture/types';
 import { api, isApiError } from '@/api/client';
 import { qs } from '@/api/inventory/paths';
-import { Notice, useErrorText } from '@/components/page';
+import { LoadingRows, Notice, useErrorText } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { useFormat } from '@/lib/format';
+import { useConfirmPrinted } from './printed-ok';
 
 type Job = { state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain' };
 type Choice = { code: string; formatId: string };
@@ -76,16 +77,15 @@ export function ServerPrint({
   batch,
   stock,
   formats,
-  onPrinted,
 }: {
   batch: LabelBatch;
   stock: LabelStock;
   formats: LabelPrintFormat[];
-  onPrinted: () => void;
 }) {
   const { t } = useLingui();
   const fmt = useFormat();
   const errorText = useErrorText();
+  const confirmPrinted = useConfirmPrinted(batch);
   const storageKey = `kept.labels.print.${batch.id}`;
   const [restored] = useState(() => restorePrint(storageKey));
   const [selectedCode, setCode] = useState(restored?.code);
@@ -134,8 +134,7 @@ export function ServerPrint({
     request?.code === code && request?.formatId === format?.id && (send.isError || status.isError);
   useEffect(() => {
     if (!send.isPending && result && !active(result)) rememberPrint(storageKey);
-    if (result?.state === 'done' && batch.labels.length === 1) onPrinted();
-  }, [batch.labels.length, onPrinted, result, send.isPending, storageKey]);
+  }, [result, send.isPending, storageKey]);
 
   if (!code || !format) return null;
   const print = () => {
@@ -149,44 +148,53 @@ export function ServerPrint({
       send.mutate(next);
     }
   };
+  const pickLabel = batch.labels.length > 1;
+  const pickFormat = formats.length > 1;
+  const rollName = ({ widthMm, heightMm }: LabelPrintFormat) => {
+    const width = fmt.num(widthMm);
+    const height = fmt.num(heightMm);
+    return t`${width} × ${height} mm`;
+  };
+  const canConfirm =
+    result?.state === 'done' && batch.labels.length === 1 && !batch.printedConfirmedAt;
 
   return (
     <section
-      className="grid gap-3 rounded-card border border-line p-3 print:hidden"
+      className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 print:hidden sm:py-8"
       aria-label={t`Print server`}
     >
-      <h2 className="m-0 text-section font-semibold">
-        <Trans>Print server</Trans>
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Combobox
-          label={t`Label`}
-          items={batch.labels.map((label) => ({
-            id: label.code,
-            label: label.name ?? printedCode(label.code),
-          }))}
-          selectedKey={code}
-          isDisabled={blocked}
-          showsChoice
-          onSelectionChange={(key) => {
-            if (key !== null) setCode(String(key));
-          }}
-        />
-        <Combobox
-          label={t`Roll format`}
-          items={formats.map((item) => {
-            const width = fmt.num(item.widthMm);
-            const height = fmt.num(item.heightMm);
-            return { id: item.id, label: t`${width} × ${height} mm` };
-          })}
-          selectedKey={format.id}
-          isDisabled={blocked}
-          showsChoice
-          onSelectionChange={(key) => {
-            if (key !== null) setFormat(String(key));
-          }}
-        />
+      <div className={pickLabel && pickFormat ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
+        {pickLabel ? (
+          <Combobox
+            label={t`Label`}
+            items={batch.labels.map((label) => ({
+              id: label.code,
+              label: label.name ?? printedCode(label.code),
+            }))}
+            selectedKey={code}
+            isDisabled={blocked}
+            showsChoice
+            onSelectionChange={(key) => {
+              if (key !== null) setCode(String(key));
+            }}
+          />
+        ) : null}
+        {pickFormat ? (
+          <Combobox
+            label={t`Roll format`}
+            items={formats.map((item) => ({ id: item.id, label: rollName(item) }))}
+            selectedKey={format.id}
+            isDisabled={blocked}
+            showsChoice
+            onSelectionChange={(key) => {
+              if (key !== null) setFormat(String(key));
+            }}
+          />
+        ) : (
+          <p className="m-0 text-center text-small text-ink-2">{rollName(format)}</p>
+        )}
       </div>
+      {preview.isPending ? <LoadingRows rows={2} /> : null}
       {preview.data ? <Preview png={preview.data.png} /> : null}
       {preview.isError ? (
         <Notice tone="danger">
@@ -195,24 +203,35 @@ export function ServerPrint({
             : errorText(preview.error)}
         </Notice>
       ) : null}
-      <div>
+      <div className="grid justify-items-center gap-2 text-center">
         <Button onPress={print} isPending={send.isPending} isDisabled={blocked || !preview.data}>
           {retry ? <Trans>Retry print request</Trans> : <Trans>Print on server</Trans>}
         </Button>
-      </div>
-      <div role="status" className="text-small text-ink-2">
-        {retry ? (
-          <Trans>
-            Could not confirm the print request. Retrying the same request will not print it twice.
-          </Trans>
-        ) : null}
-        {blocked ? <Trans>Waiting for the print server…</Trans> : null}
-        {result?.state === 'done' ? <Trans>The printer finished this label.</Trans> : null}
-        {result?.state === 'failed' ? (
-          <Trans>The print server could not print the label.</Trans>
-        ) : null}
-        {result?.state === 'uncertain' ? (
-          <Trans>Check the physical label before printing again.</Trans>
+        <div role="status" className="text-small text-ink-2">
+          {retry ? (
+            <Trans>
+              Could not confirm the print request. Retrying the same request will not print it
+              twice.
+            </Trans>
+          ) : null}
+          {blocked ? <Trans>Waiting for the print server…</Trans> : null}
+          {result?.state === 'done' ? <Trans>The printer finished this label.</Trans> : null}
+          {result?.state === 'failed' ? (
+            <Trans>The print server could not print the label.</Trans>
+          ) : null}
+          {result?.state === 'uncertain' ? (
+            <Trans>Check the physical label before printing again.</Trans>
+          ) : null}
+        </div>
+        {canConfirm ? (
+          <Button
+            variant="secondary"
+            size="small"
+            isPending={confirmPrinted.isPending}
+            onPress={() => confirmPrinted.mutate()}
+          >
+            <Trans>Yes, printed OK</Trans>
+          </Button>
         ) : null}
       </div>
     </section>

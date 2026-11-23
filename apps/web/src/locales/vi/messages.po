@@ -21488,3 +21488,7 @@ msgstr "Cài đặt lưu ở đây sẽ được ưu tiên hơn tệp cấu hìn
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "Dùng địa chỉ của cầu nối đang chạy gần máy in. Máy chủ Kept phải có thể truy cập địa chỉ đó."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "In từ trình duyệt"

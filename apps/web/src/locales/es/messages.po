@@ -29440,3 +29440,7 @@ msgstr "Al guardar aquí se da prioridad a estos ajustes sobre el archivo de con
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "Usa la dirección del puente que se ejecuta cerca de la impresora. El servidor de Kept debe poder acceder a él."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "Imprimir desde el navegador"

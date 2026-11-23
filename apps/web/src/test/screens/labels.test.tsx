@@ -96,6 +96,11 @@ describe('the batch builder', () => {
     );
     await user.click(await screen.findByRole('button', { name: 'Print on server' }));
     const section = await screen.findByRole('region', { name: 'Print server' });
+    expect(await within(section).findByRole('img', { name: 'Label preview' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Sheet 1 of 1' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Print' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Share as images' })).toBeNull();
+    expect(within(section).queryByRole('combobox', { name: 'Label' })).toBeNull();
     const picker = within(section).getByRole('combobox', { name: 'Roll format' });
     await user.click(picker);
     await user.keyboard('{ArrowDown}');
@@ -517,12 +522,13 @@ describe('the print view', () => {
     ...over,
   });
 
-  it('previews 40 × 40 mm on the server when that roll is selected in the print view', async () => {
+  it('keeps the selected 40 × 40 mm roll when switching print modes', async () => {
     const state = ownerScenario();
     const saved = batch();
     state.capture.labelBatches.unshift(saved);
     const preview = vi.fn();
-    await renderApp(`/labels/${saved.id}?stock=thermal_40x40`, {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const { user, router } = await renderApp(`/labels/${saved.id}?stock=thermal_40x40`, {
       state,
       setup(mock) {
         mock.on('GET', capturePaths.labelPrintServer, () => ({
@@ -542,6 +548,20 @@ describe('the print view', () => {
       '40 × 40 mm',
     );
     await waitFor(() => expect(preview).toHaveBeenCalledWith('40x40'));
+
+    await user.click(screen.getByRole('link', { name: 'Browser printing' }));
+    const sheet = await screen.findByRole('region', { name: 'Sheet 1 of 1' });
+    expect(sheet.style.inlineSize).toBe('40mm');
+    expect(sheet.style.blockSize).toBe('39.9mm');
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Share as images' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Print server' })).toBeNull();
+    expect(router.state.location.search).toMatchObject({ stock: 'thermal_40x40', mode: 'browser' });
+
+    await user.click(screen.getByRole('link', { name: 'Print server' }));
+    await screen.findByRole('region', { name: 'Print server' });
+    expect(screen.queryByRole('region', { name: 'Sheet 1 of 1' })).toBeNull();
+    expect(print).not.toHaveBeenCalled();
   });
 
   it('keeps an Arabic name in its own direction and the code left to right, in Arabic', async () => {

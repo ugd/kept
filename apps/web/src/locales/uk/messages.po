@@ -31423,3 +31423,7 @@ msgstr "Збережені тут налаштування мають пріор
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "Використайте адресу шлюзу, який працює поруч із принтером. Сервер Kept має мати до нього доступ."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "Друк із браузера"

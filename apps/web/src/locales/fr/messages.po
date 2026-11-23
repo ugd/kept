@@ -29440,3 +29440,7 @@ msgstr "L’enregistrement de ces paramètres remplace ceux du fichier de config
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "Utilisez l’adresse de la passerelle qui tourne à proximité de l’imprimante. Le serveur Kept doit pouvoir y accéder."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "Imprimer depuis le navigateur"

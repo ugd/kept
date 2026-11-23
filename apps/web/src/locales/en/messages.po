@@ -29440,3 +29440,7 @@ msgstr "Saving here overrides the print server configuration file for this locat
 #: src/components/labels/print-server-settings.tsx
 msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
 msgstr "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
+
+#: src/routes/_print/labels.$batchId.tsx
+msgid "Browser printing"
+msgstr "Browser printing"
