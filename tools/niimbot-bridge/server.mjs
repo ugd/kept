@@ -11,6 +11,9 @@ const hash = (value) => createHash('sha256').update(value).digest();
 const jobId = /^[a-f0-9]{32}$/;
 const maxBytes = 128 * 1024;
 const pngMagic = Buffer.from('89504e470d0a1a0a', 'hex');
+const MAX_ROLL_WIDTH_MM = 50;
+const MAX_PRINTABLE_WIDTH_MM = 48;
+const DOTS_PER_MM = 8;
 
 function answer(response, status, data) {
   response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -27,18 +30,21 @@ async function readPrint(request) {
       chunks.push(chunk);
     }
     const { id, format, png } = JSON.parse(Buffer.concat(chunks).toString());
+    const { widthMm, heightMm, dotsPerMm, printableWidthMm = widthMm } = format ?? {};
     if (
       typeof id !== 'string' ||
       !jobId.test(id) ||
       typeof png !== 'string' ||
-      !format ||
-      format.dotsPerMm !== 8 ||
-      !Number.isFinite(format.widthMm) ||
-      !Number.isFinite(format.heightMm) ||
-      format.widthMm < 8 ||
-      format.widthMm > 48 ||
-      format.heightMm < 8 ||
-      format.heightMm > 200
+      dotsPerMm !== DOTS_PER_MM ||
+      !Number.isFinite(widthMm) ||
+      widthMm < 8 ||
+      widthMm > MAX_ROLL_WIDTH_MM ||
+      !Number.isFinite(printableWidthMm) ||
+      printableWidthMm < 8 ||
+      printableWidthMm > Math.min(widthMm, MAX_PRINTABLE_WIDTH_MM) ||
+      !Number.isFinite(heightMm) ||
+      heightMm < 8 ||
+      heightMm > 200
     )
       return null;
     const image = Buffer.from(png, 'base64');
@@ -48,8 +54,8 @@ async function readPrint(request) {
     }).metadata();
     if (
       pages !== undefined ||
-      width !== Math.round(format.widthMm * 8) ||
-      height !== Math.round(format.heightMm * 8)
+      width !== Math.round(printableWidthMm * DOTS_PER_MM) ||
+      height !== Math.round(heightMm * DOTS_PER_MM)
     )
       return null;
     return { id, image, fingerprint: hash(image).toString('hex') };

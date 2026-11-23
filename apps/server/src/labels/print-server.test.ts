@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
-import { loadPrintServer, renderPrintLabel } from './print-server.js';
+import { loadPrintServer, PrintFormat, renderPrintLabel } from './print-server.js';
 
 const locationId = 'a42fb121-67a9-47bf-81a7-fee06306712d';
 const format = { id: '12x30', widthMm: 12, heightMm: 30, dotsPerMm: 8 };
@@ -24,6 +24,20 @@ describe('server label printing', () => {
     await expect(
       renderPrintLabel({ ...label, url: `${label.url}${'abc'.repeat(60)}` }, format),
     ).rejects.toMatchObject({ code: 'validation' });
+  });
+
+  it('uses the printable width for the raster while retaining the physical roll size', async () => {
+    const roll = PrintFormat.parse({
+      id: '50x30',
+      widthMm: 50,
+      printableWidthMm: 48,
+      heightMm: 30,
+      dotsPerMm: 8,
+    });
+    const image = await renderPrintLabel(label, roll);
+    expect(await sharp(image).metadata()).toMatchObject({ width: 384, height: 240 });
+    expect(roll.widthMm).toBe(50);
+    expect(PrintFormat.safeParse({ ...roll, printableWidthMm: 51 }).success).toBe(false);
   });
 
   it('uses a server-side credential and an idempotent job identifier for the configured location', async () => {

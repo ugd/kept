@@ -872,7 +872,7 @@ it('previews and sends the selected roll raster once, with an audit event and no
         locations: [home.id],
         formats: [
           { id: '12x30', widthMm: 12, heightMm: 30, dotsPerMm: 8 },
-          { id: '40x30', widthMm: 40, heightMm: 30, dotsPerMm: 8 },
+          { id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30, dotsPerMm: 8 },
         ],
       }),
     );
@@ -888,20 +888,21 @@ it('previews and sends the selected roll raster once, with an audit event and no
     );
     expect(capabilities.json().formats.map((item: { id: string }) => item.id)).toEqual([
       '12x30',
-      '40x30',
+      '50x30',
     ]);
+    expect(capabilities.json().formats[1]).toMatchObject({ widthMm: 50, printableWidthMm: 48 });
     const base = `/api/v1/labels/batches/${labels.id}/print-server`;
-    const preview = await call(configured, `${base}/preview?code=${code}&formatId=40x30`, {
+    const preview = await call(configured, `${base}/preview?code=${code}&formatId=50x30`, {
       as: ibrahim,
     });
     expect(preview.statusCode).toBe(200);
     const png = preview.json<{ png: string }>().png;
     expect(await sharp(Buffer.from(png, 'base64')).metadata()).toMatchObject({
-      width: 320,
+      width: 384,
       height: 240,
     });
     const requestId = newId();
-    const body = { code, formatId: '40x30', requestId };
+    const body = { code, formatId: '50x30', requestId };
     const headers = { 'idempotency-key': requestId };
     expect((await call(configured, `${base}/jobs`, { as: talia, body })).statusCode).toBe(403);
     expect((await call(configured, `${base}/jobs`, { as: bruce, body })).statusCode).toBe(404);
@@ -911,7 +912,10 @@ it('previews and sends the selected roll raster once, with an audit event and no
     const retry = await call(configured, `${base}/jobs`, { as: ibrahim, body, headers });
     expect(retry.headers['idempotent-replayed']).toBe('true');
     expect(jobs).toHaveLength(1);
-    expect(jobs[0]).toMatchObject({ format: { id: '40x30' }, png });
+    expect(jobs[0]).toMatchObject({
+      format: { id: '50x30', widthMm: 50, printableWidthMm: 48 },
+      png,
+    });
     expect((await call(configured, `${base}/jobs/${requestId}`, { as: ibrahim })).json()).toEqual({
       state: 'done',
     });

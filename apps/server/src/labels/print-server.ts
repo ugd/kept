@@ -9,12 +9,22 @@ import { guardedFetch, PrivateAddressError } from '../net/ssrf.js';
 import { drawShortCode } from './print-short-code.js';
 
 export const FormatId = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/);
-export const PrintFormat = z.strictObject({
-  id: FormatId,
-  widthMm: z.number().min(8).max(120),
-  heightMm: z.number().min(8).max(200),
-  dotsPerMm: z.number().min(8).max(12),
-});
+export const PrintFormat = z
+  .strictObject({
+    id: FormatId,
+    widthMm: z.number().min(8).max(120),
+    printableWidthMm: z.number().min(8).max(120).optional(),
+    heightMm: z.number().min(8).max(200),
+    dotsPerMm: z.number().min(8).max(12),
+  })
+  .refine(
+    ({ widthMm, printableWidthMm }) =>
+      printableWidthMm === undefined || printableWidthMm <= widthMm,
+    {
+      path: ['printableWidthMm'],
+      message: 'Printable width must fit on the roll',
+    },
+  );
 export type PrintFormat = z.infer<typeof PrintFormat>;
 export const PrintServerState = z.object({
   state: z.enum(['queued', 'printing', 'done', 'failed', 'uncertain']),
@@ -98,7 +108,7 @@ export async function loadPrintServer(file: string | undefined, send?: typeof fe
 /** Render the same immutable Kept URL and short ID for the preview and the job. */
 export async function renderPrintLabel(label: { code: string; url: string }, format: PrintFormat) {
   if (!SHORT_CODE.test(label.code)) throw invalid();
-  const width = Math.round(format.widthMm * format.dotsPerMm);
+  const width = Math.round((format.printableWidthMm ?? format.widthMm) * format.dotsPerMm);
   const height = Math.round(format.heightMm * format.dotsPerMm);
   const matrix = encode(label.url, { ecc: 'M', border: 4 }).data;
   const text = printedCode(label.code);

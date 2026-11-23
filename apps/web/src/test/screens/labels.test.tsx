@@ -83,7 +83,7 @@ describe('the batch builder', () => {
             reply(200, {
               formats: [
                 { id: '12x30', widthMm: 12, heightMm: 30 },
-                { id: '40x30', widthMm: 40, heightMm: 30 },
+                { id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30 },
               ],
             }),
           );
@@ -99,7 +99,7 @@ describe('the batch builder', () => {
     const picker = within(section).getByRole('combobox', { name: 'Roll format' });
     await user.click(picker);
     await user.keyboard('{ArrowDown}');
-    await user.click(await screen.findByRole('option', { name: '40 × 30 mm' }));
+    await user.click(await screen.findByRole('option', { name: '50 × 30 mm' }));
     const send = within(section).getByRole('button', { name: 'Print on server' });
     await waitFor(() => expect(send).toBeEnabled());
     await user.click(send);
@@ -108,7 +108,7 @@ describe('the batch builder', () => {
     const batchId = pathOf(router).split('/').at(-1) ?? '';
     expect(mock.lastCall('POST', capturePaths.labelServerJobs(batchId))?.body).toMatchObject({
       code: '7KQ4MZ',
-      formatId: '40x30',
+      formatId: '50x30',
     });
     expect(print).not.toHaveBeenCalled();
   });

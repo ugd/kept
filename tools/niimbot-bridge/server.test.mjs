@@ -3,6 +3,38 @@ import { test } from 'node:test';
 import sharp from 'sharp';
 import { makeServer } from './server.mjs';
 
+test('accepts a 50 mm roll using 48 mm of printable width', async (t) => {
+  const token = 'test-only-bridge-token';
+  const { promise: printed, resolve: print } = Promise.withResolvers();
+  const server = makeServer({
+    token,
+    database: ':memory:',
+    async printLabel(png) {
+      print(png);
+    },
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}/api/kept/v1/jobs`;
+  const format = { id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30, dotsPerMm: 8 };
+  const png = await sharp({ create: { width: 384, height: 240, channels: 3, background: 'white' } })
+    .png()
+    .toBuffer();
+  const post = (selectedFormat) =>
+    fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 'af'.repeat(16),
+        format: selectedFormat,
+        png: png.toString('base64'),
+      }),
+    });
+  assert.equal((await post({ ...format, printableWidthMm: 50 })).status, 422);
+  assert.equal((await post(format)).status, 202);
+  assert.deepEqual(await printed, png);
+});
+
 test('the bridge validates the raster, authorizes Kept and prints a retry just once', async (t) => {
   const token = 'test-only-bridge-token';
   let printed;
