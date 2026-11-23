@@ -469,6 +469,7 @@ const FUNCTIONS: Record<string, { roles: string[]; definer: boolean }> = {
   // server once kept_app's checks passed; and the trigger that drops a moved thing's links (it
   // must see links the mover can't). Nobody calls the trigger.
   'kept.paperless_config(uuid)': { roles: SYS, definer: true },
+  'kept.label_print_config(uuid)': { roles: SYS, definer: true },
   'kept.drop_moved_paperless_links()': { roles: NOBODY, definer: true },
   // (0080) An archive import's target, set once by its creator; the prune-imports
   // job's view of abandoned runs and the door that clears one.
@@ -964,6 +965,9 @@ describe('catalogue', () => {
                    has_column_privilege(r, 'public.mailboxes', 'config_ciphertext', 'SELECT')),
                   ('SELECT paperless_connections.config_ciphertext',
                    has_column_privilege(r, 'public.paperless_connections', 'config_ciphertext',
+                                        'SELECT')),
+                  ('SELECT label_print_connections.config_ciphertext',
+                   has_column_privilege(r, 'public.label_print_connections', 'config_ciphertext',
                                         'SELECT')),
                   ('SELECT share_links.token_hash',
                    has_column_privilege(r, 'public.share_links', 'token_hash', 'SELECT')),

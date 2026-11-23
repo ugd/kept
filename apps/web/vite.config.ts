@@ -189,6 +189,7 @@ const HOUSEHOLD_ROUTES = [
     'settings.location.$id.email-in',
     // 1.x (D248): a location's Paperless-ngx connection.
     'settings.location.$id.paperless',
+    'settings.location.$id.label-print-server',
     // 1.x (D235): condition reports and one report.
     'condition-reports',
     'condition-reports.$id',
@@ -222,6 +223,7 @@ const COMPONENT_ONLY_ROUTES = new Set<string>([
   '/_app/settings/location/$id/track',
   '/_app/settings/location/$id/email-in',
   '/_app/settings/location/$id/paperless',
+  '/_app/settings/location/$id/label-print-server',
   '/_app/settings/location/$id/share-links',
   // 1.5 (D233): the public page of a share link reads the server only.
   '/s/$token',

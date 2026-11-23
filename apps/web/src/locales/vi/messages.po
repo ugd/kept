@@ -21412,3 +21412,79 @@ msgstr "Đang chờ máy chủ in…"
 #: src/components/labels/server-print.tsx
 msgid "{width} × {height} mm"
 msgstr "{width} × {height} mm"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Add format"
+msgstr "Thêm định dạng"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Check the dimensions and resolution of each label format."
+msgstr "Kiểm tra kích thước và độ phân giải của từng định dạng nhãn."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Configured on the server"
+msgstr "Đã cấu hình trên máy chủ"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Disconnect print server?"
+msgstr "Ngắt kết nối máy chủ in?"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Label formats"
+msgstr "Định dạng nhãn"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Label height (mm)"
+msgstr "Chiều cao nhãn (mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Leave blank to keep the saved token."
+msgstr "Để trống để tiếp tục dùng mã đã lưu."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Leave the printable width empty to use the full roll width."
+msgstr "Để trống chiều rộng in để sử dụng toàn bộ chiều rộng cuộn."
+
+#: src/components/history/labels.ts
+msgid "Print server disconnected"
+msgstr "Đã ngắt kết nối máy chủ in"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Print server is reachable"
+msgstr "Có thể kết nối đến máy chủ in"
+
+#: src/components/history/labels.ts
+msgid "Print server settings saved"
+msgstr "Đã lưu cài đặt máy chủ in"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Print server URL"
+msgstr "URL máy chủ in"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Printable width (mm)"
+msgstr "Chiều rộng in (mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Printer connection"
+msgstr "Kết nối máy in"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Remove format"
+msgstr "Xóa định dạng"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Resolution (dots/mm)"
+msgstr "Độ phân giải (điểm/mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Roll width (mm)"
+msgstr "Chiều rộng cuộn (mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Saving here overrides the print server configuration file for this location."
+msgstr "Cài đặt lưu ở đây sẽ được ưu tiên hơn tệp cấu hình máy chủ in của địa điểm này."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
+msgstr "Dùng địa chỉ của cầu nối đang chạy gần máy in. Máy chủ Kept phải có thể truy cập địa chỉ đó."

@@ -565,6 +565,8 @@ export function useSummary() {
       'inbox.bulk': () => t`Changed several inbox items at once`,
       'labels.printed': () => t`Printed labels`,
       'labels.print_server': () => t`Sent a label to the print server`,
+      'labels.print_connection_saved': () => t`Print server settings saved`,
+      'labels.print_connection_removed': () => t`Print server disconnected`,
       'label_batch.dismiss': () => t`Set aside a label sheet that was not printed`,
       'purchase.capture': () => t`Captured a receipt`,
       'purchase.confirm': () => t`Confirmed a receipt`,

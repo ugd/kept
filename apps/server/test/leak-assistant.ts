@@ -144,6 +144,11 @@ export async function fillAssistant(c: pg.ClientBase, t: Tenant, label: string):
     [t.locationId, mailbox],
   );
 
+  await c.query(
+    `INSERT INTO public.label_print_connections (location_id, base_url, formats, config_ciphertext, key_version)
+     VALUES ($1, $2, '[{"id":"50x30","widthMm":50,"heightMm":30,"dotsPerMm":8}]', '{"v":1,"c":"x"}', 1)`,
+    [t.locationId, `https://printer.${label}.example.test`],
+  );
   // Paperless-ngx (1.x): a connection with a (fake) sealed token, and a thing's link to one
   // of its documents.
   const paperless = await one(

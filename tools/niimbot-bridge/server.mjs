@@ -95,6 +95,10 @@ export function makeServer({ token, database, printLabel }) {
       answer(response, 401, { error: 'Unauthorized' });
       return;
     }
+    if (request.method === 'GET' && request.url === '/api/kept/v1/health') {
+      answer(response, 200, { ok: true });
+      return;
+    }
     if (request.method === 'GET' && request.url?.startsWith(`${path}/`)) {
       const id = request.url.slice(path.length + 1);
       const job = jobId.test(id) ? find.get(id) : undefined;

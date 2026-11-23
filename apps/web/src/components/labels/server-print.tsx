@@ -3,7 +3,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { capturePaths } from '@/api/capture/paths';
-import type { LabelBatch } from '@/api/capture/types';
+import type { LabelBatch, LabelPrintFormat } from '@/api/capture/types';
 import { api, isApiError } from '@/api/client';
 import { qs } from '@/api/inventory/paths';
 import { Notice, useErrorText } from '@/components/page';
@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { useFormat } from '@/lib/format';
 
-type Format = { id: string; widthMm: number; heightMm: number };
 type Job = { state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain' };
 type Choice = { code: string; formatId: string };
 type PrintRequest = Choice & { requestId: string };
@@ -20,7 +19,7 @@ export function usePrintServer(locationId: string | undefined) {
   return useQuery({
     queryKey: ['labels', 'print-server', locationId],
     queryFn: () =>
-      api.get<{ formats: Format[] }>(capturePaths.labelPrintServer + qs({ locationId })),
+      api.get<{ formats: LabelPrintFormat[] }>(capturePaths.labelPrintServer + qs({ locationId })),
     enabled: !!locationId,
     staleTime: 60_000,
     retry: false,
@@ -79,7 +78,7 @@ export function ServerPrint({
   onPrinted,
 }: {
   batch: LabelBatch;
-  formats: Format[];
+  formats: LabelPrintFormat[];
   onPrinted: () => void;
 }) {
   const { t } = useLingui();
@@ -94,7 +93,7 @@ export function ServerPrint({
     batch.labels.find((label) => label.code === selectedCode)?.code ?? batch.labels[0]?.code;
   const format = formats.find((item) => item.id === selectedFormat) ?? formats[0];
   const preview = useQuery({
-    queryKey: ['labels', 'print-server', batch.id, code, format?.id],
+    queryKey: ['labels', 'print-server', batch.id, code, format],
     enabled: !!(code && format),
     queryFn: ({ signal }) =>
       api.get<{ png: string }>(

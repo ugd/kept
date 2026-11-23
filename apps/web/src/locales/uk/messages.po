@@ -31347,3 +31347,79 @@ msgstr "Очікування відповіді сервера друку…"
 #: src/components/labels/server-print.tsx
 msgid "{width} × {height} mm"
 msgstr "{width} × {height} мм"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Add format"
+msgstr "Додати формат"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Check the dimensions and resolution of each label format."
+msgstr "Перевірте розміри й роздільну здатність кожного формату етикеток."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Configured on the server"
+msgstr "Налаштовано на сервері"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Disconnect print server?"
+msgstr "Від’єднати сервер друку?"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Label formats"
+msgstr "Формати етикеток"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Label height (mm)"
+msgstr "Висота етикетки (мм)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Leave blank to keep the saved token."
+msgstr "Залиште поле порожнім, щоб зберегти поточний токен."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Leave the printable width empty to use the full roll width."
+msgstr "Залиште поле ширини друку порожнім, щоб використовувати всю ширину рулону."
+
+#: src/components/history/labels.ts
+msgid "Print server disconnected"
+msgstr "Сервер друку від’єднано"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Print server is reachable"
+msgstr "Сервер друку доступний"
+
+#: src/components/history/labels.ts
+msgid "Print server settings saved"
+msgstr "Налаштування сервера друку збережено"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Print server URL"
+msgstr "URL сервера друку"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Printable width (mm)"
+msgstr "Ширина друку (мм)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Printer connection"
+msgstr "Підключення принтера"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Remove format"
+msgstr "Видалити формат"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Resolution (dots/mm)"
+msgstr "Роздільна здатність (точок/мм)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Roll width (mm)"
+msgstr "Ширина рулону (мм)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Saving here overrides the print server configuration file for this location."
+msgstr "Збережені тут налаштування мають пріоритет над файлом конфігурації сервера друку для цього місця."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
+msgstr "Використайте адресу шлюзу, який працює поруч із принтером. Сервер Kept має мати до нього доступ."

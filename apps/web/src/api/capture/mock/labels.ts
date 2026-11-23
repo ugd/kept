@@ -38,6 +38,7 @@ import type {
   LabelBatch,
   LabelBatchPreview,
   LabelCellContent,
+  LabelPrintConnection,
 } from '../types';
 import { allocateCode } from './capture';
 import { urlOf } from './state';
@@ -66,6 +67,14 @@ export function labelsRoutes(state: MockState): MockRoute[] {
     cap().codes.some((c) => c.code === code);
   const labelsOn = (locationId: string) =>
     state.locations.find((l) => l.id === locationId)?.modules.includes('labels') ?? false;
+  const printers = new Map<string, LabelPrintConnection>();
+  function printGate(id: string, settings = false) {
+    const gate = sessionGate(state);
+    if (gate) return gate;
+    if (!access().visible(id)) return notFound();
+    if (settings ? !access().isAdmin(id) : !access().canWrite(id)) return forbidden();
+    return labelsOn(id) ? null : err(404, 'module_off', 'Labels are off in this location.');
+  }
   /** The thing or place now carries a printed label (StoredThing/StoredPlace.labelPrinted). */
   const markLabelled = (target: { kind: 'thing' | 'place'; id: string }) => {
     const rows: { id: string; labelPrinted?: boolean }[] =
@@ -79,7 +88,40 @@ export function labelsRoutes(state: MockState): MockRoute[] {
   const printedCodes = () => printedCodesOf(state);
 
   return [
-    route('GET', p.labelPrintServer, () => sessionGate(state) ?? reply(200, { formats: [] })),
+    route('GET', p.labelPrintServer, ({ query }) => {
+      const id = query.get('locationId') ?? '';
+      return printGate(id) ?? reply(200, { formats: printers.get(id)?.formats ?? [] });
+    }),
+    route(
+      'GET',
+      p.labelPrintSettings(':id'),
+      ({ params: { id = '' } }) =>
+        printGate(id, true) ?? reply(200, { connection: printers.get(id) ?? null }),
+    ),
+    route('PUT', p.labelPrintSettings(':id'), ({ params: { id = '' }, body }) => {
+      const gate = printGate(id, true);
+      if (gate) return gate;
+      const { url, formats, token } = body as Omit<LabelPrintConnection, 'source'> & {
+        token?: string;
+      };
+      if (!token && printers.get(id)?.url !== url)
+        return err(400, 'validation', 'Enter the print server token for this address.');
+      const connection: LabelPrintConnection = { url, formats, source: 'settings' };
+      printers.set(id, connection);
+      return reply(200, { connection });
+    }),
+    route('DELETE', p.labelPrintSettings(':id'), ({ params: { id = '' } }) => {
+      const gate = printGate(id, true);
+      if (gate) return gate;
+      printers.delete(id);
+      return reply(204);
+    }),
+    route(
+      'POST',
+      p.labelPrintCheck(':id'),
+      ({ params: { id = '' } }) =>
+        printGate(id, true) ?? (printers.has(id) ? reply(200, { ok: true }) : notFound()),
+    ),
     route('GET', p.labelServerPreview(':id'), () => sessionGate(state) ?? notFound()),
     route('POST', p.labelServerJobs(':id'), () => sessionGate(state) ?? notFound()),
     route('GET', p.labelServerJob(':id', ':requestId'), () => sessionGate(state) ?? notFound()),

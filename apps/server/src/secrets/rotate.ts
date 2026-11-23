@@ -119,6 +119,14 @@ export const CIPHERTEXTS: readonly SealedColumn[] = Object.freeze([
     fieldKey: { constant: 'config' },
     ciphertextColumn: 'config_ciphertext',
   }),
+  sealedColumn({
+    name: 'label print server connections',
+    table: 'public.label_print_connections',
+    aadTable: 'label_print_connections',
+    fieldKey: { constant: 'config' },
+    idColumn: 'location_id',
+    ciphertextColumn: 'config_ciphertext',
+  }),
 ]);
 
 /**

@@ -20,7 +20,15 @@ export function LocationSettingsPage({
 }: {
   id: string;
   /** Which tab a sub-page belongs to (Invite belongs to Members). */
-  section?: 'general' | 'members' | 'track' | 'webhooks' | 'email-in' | 'paperless' | 'share-links';
+  section?:
+    | 'general'
+    | 'members'
+    | 'track'
+    | 'webhooks'
+    | 'email-in'
+    | 'paperless'
+    | 'label-print-server'
+    | 'share-links';
   /** The page title; defaults to "Location settings". */
   title?: (location: LocationDetail) => ReactNode;
   children: (location: LocationDetail) => ReactNode;
@@ -95,6 +103,18 @@ export function LocationSettingsPage({
                   key: 'paperless',
                   label: <Trans>Paperless</Trans>,
                   link: { to: '/settings/location/$id/paperless' as const, params: { id } },
+                },
+              ]
+            : []),
+          ...(admin && (loc.effectiveModules ?? loc.modules).includes('labels')
+            ? [
+                {
+                  key: 'label-print-server',
+                  label: <Trans>Print server</Trans>,
+                  link: {
+                    to: '/settings/location/$id/label-print-server' as const,
+                    params: { id },
+                  },
                 },
               ]
             : []),

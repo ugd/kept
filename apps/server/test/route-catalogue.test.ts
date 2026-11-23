@@ -67,6 +67,8 @@ const ALLOWLIST: Record<string, string> = {
     "signs in to the location's saved mailbox to say whether it works, rate-limited to 6 a minute; it changes nothing (connecting, changing and removing the mailbox are audited: mailbox.create, mailbox.update, mailbox.delete)",
   'POST /api/v1/locations/:id/paperless/check':
     "signs in to the location's saved Paperless-ngx to say whether it works and which version it runs, rate-limited to 6 a minute; it changes nothing (connecting, changing and disconnecting are audited: paperless.connect, paperless.update, paperless.disconnect)",
+  'POST /api/v1/locations/:id/label-print-server/check':
+    'checks the saved bridge credential and reachability without submitting a print job, rate-limited to 6 a minute',
   'POST /api/v1/home-assistant/link-requests':
     "#376: Home Assistant asks to link the Kept integration, with the app's link secret; the request lives in the process's memory for ten minutes and changes nothing, and the token a person's approval makes is audited (token.create)",
   'POST /api/v1/home-assistant/link-requests/:id/claim':

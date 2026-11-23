@@ -10,7 +10,13 @@ Start the bridge with `npm start`. It listens on loopback by default. If Kept an
 
 ## Connect Kept
 
-Save a server-side file called `label-print.json` with the connection and the rolls you have. Use the same secret in `token` and `BRIDGE_TOKEN`. The IDs in `locations` are the Kept location IDs. The first format is the initial selection. Width is across the printhead and height is in the feed direction. For a roll wider than the printhead, set `printableWidthMm` to the printhead's usable width. The picker shows the physical roll size. On a 50 × 30 mm roll, the B21S-C2B uses a 384 × 240 dot raster for the printable area.
+Open **Settings → Locations → your location → Print server** as an owner or admin with Labels enabled. Enter the bridge's base URL and paste the same key as `BRIDGE_TOKEN`. Kept must be able to reach that URL from its server. For a LAN or VPN address, the instance admin can enable private addresses in **Admin → Settings**. Use HTTPS for a public address. Plain HTTP is available with private addresses enabled and a private destination.
+
+For a **50 × 30 mm** NIIMBOT roll, set the roll width to **50**, label height to **30**, printable width to **48**, and resolution to **8 dots/mm**. This makes a 384 × 240 dot raster. Width is across the printhead and height is in the feed direction. Add the formats you use and select **Save**, then **Test connection**. The test checks the bridge and key without submitting a job. The first format is the initial print selection.
+
+### File-based configuration
+
+For a file-managed Kept installation, save a server-side `label-print.json` with the connection and your rolls. A connection saved in the location UI takes precedence. Disconnecting it in the UI returns the location to the file configuration when one exists. Use the same secret in `token` and `BRIDGE_TOKEN`. The IDs in `locations` are the Kept location IDs.
 
 ```json
 {
@@ -31,6 +37,6 @@ Set `KEPT_LABEL_PRINT_CONFIG_FILE` to the path the Kept server can read. In Dock
 
 Open a thing in Kept and choose **Label → Print → Print on server**. Select the format that matches the loaded roll and check the preview. Press **Print on server** to send one copy. After the printer finishes a one-label batch, verify the sticker and use Kept's confirmation to mark it printed. The bridge supports die-cut rolls with gaps, a physical width up to 50 mm and a printable width up to 48 mm at eight dots per millimetre. Keep a recognized RFID tag in the printer. The printer profile uses B1 and density 3. [B21S-C2B specifications](https://printers.niim.blue/hardware/models/)
 
-The bridge API requires `Authorization: Bearer <token>`. `POST /api/kept/v1/jobs` accepts `{id, format, png}` with a 32-character lowercase hex ID, the selected format object and a base64 PNG. Reusing the ID with the same raster returns its existing state. `GET /api/kept/v1/jobs/<id>` returns the job state. Both responses use `{state}` with one of `queued`, `printing`, `done`, `failed` or `uncertain`.
+The bridge API requires `Authorization: Bearer <token>`. `GET /api/kept/v1/health` returns `{ok: true}` when the token is accepted. `POST /api/kept/v1/jobs` accepts `{id, format, png}` with a 32-character lowercase hex ID, the selected format object and a base64 PNG. Reusing the ID with the same raster returns its existing state. `GET /api/kept/v1/jobs/<id>` returns the job state. Both job responses use `{state}` with one of `queued`, `printing`, `done`, `failed` or `uncertain`.
 
 Run `npm test` here to check request authentication, exact raster dimensions and idempotency without a physical print.

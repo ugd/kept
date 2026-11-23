@@ -29364,3 +29364,79 @@ msgstr "En attente du serveur d’impression…"
 #: src/components/labels/server-print.tsx
 msgid "{width} × {height} mm"
 msgstr "{width} × {height} mm"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Add format"
+msgstr "Ajouter un format"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Check the dimensions and resolution of each label format."
+msgstr "Vérifiez les dimensions et la résolution de chaque format d’étiquette."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Configured on the server"
+msgstr "Configuré sur le serveur"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Disconnect print server?"
+msgstr "Déconnecter le serveur d’impression ?"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Label formats"
+msgstr "Formats d’étiquettes"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Label height (mm)"
+msgstr "Hauteur de l’étiquette (mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Leave blank to keep the saved token."
+msgstr "Laissez ce champ vide pour conserver le jeton enregistré."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Leave the printable width empty to use the full roll width."
+msgstr "Laissez la largeur imprimable vide pour utiliser toute la largeur du rouleau."
+
+#: src/components/history/labels.ts
+msgid "Print server disconnected"
+msgstr "Serveur d’impression déconnecté"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Print server is reachable"
+msgstr "Le serveur d’impression est accessible"
+
+#: src/components/history/labels.ts
+msgid "Print server settings saved"
+msgstr "Paramètres du serveur d’impression enregistrés"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Print server URL"
+msgstr "URL du serveur d’impression"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Printable width (mm)"
+msgstr "Largeur imprimable (mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Printer connection"
+msgstr "Connexion de l’imprimante"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Remove format"
+msgstr "Supprimer le format"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Resolution (dots/mm)"
+msgstr "Résolution (points/mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Roll width (mm)"
+msgstr "Largeur du rouleau (mm)"
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Saving here overrides the print server configuration file for this location."
+msgstr "L’enregistrement de ces paramètres remplace ceux du fichier de configuration du serveur d’impression pour ce lieu."
+
+#: src/components/labels/print-server-settings.tsx
+msgid "Use the address of the bridge running near the printer. The Kept server must be able to reach it."
+msgstr "Utilisez l’adresse de la passerelle qui tourne à proximité de l’imprimante. Le serveur Kept doit pouvoir y accéder."

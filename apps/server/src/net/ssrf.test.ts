@@ -103,4 +103,17 @@ describe('guardedFetch', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ data: [] });
   });
+
+  it('keeps local HTTP off public addresses, including DNS answers', async () => {
+    const f = guardedFetch({
+      allowPrivate: true,
+      privateOnly: true,
+      resolve: (_host, cb) => cb(null, [{ address: '8.8.8.8', family: 4 }]),
+    });
+    await expect(f('http://8.8.8.8/health')).rejects.toBeInstanceOf(PrivateAddressError);
+    await expect(f('http://public.example.test/health')).rejects.toBeInstanceOf(
+      PrivateAddressError,
+    );
+    expect((await f(`http://127.0.0.1:${port}/health`)).status).toBe(200);
+  });
 });

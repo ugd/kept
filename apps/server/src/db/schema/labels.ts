@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -22,6 +23,25 @@ import { shortIds } from './things.js';
 
 export const LABEL_BATCH_KINDS = ['things', 'places', 'blank'] as const;
 const batchKind = textEnum('kind', LABEL_BATCH_KINDS);
+
+/** The optional print-server connection for a location. The credential is write-only. */
+export const labelPrintConnections = pgTable(
+  'label_print_connections',
+  {
+    locationId: uuid('location_id')
+      .primaryKey()
+      .references(() => locations.id, { onDelete: 'cascade' }),
+    baseUrl: text('base_url').notNull(),
+    formats: jsonb('formats').notNull(),
+    configCiphertext: jsonb('config_ciphertext').notNull(),
+    keyVersion: integer('key_version').notNull(),
+  },
+  (t) => [
+    check('label_print_connections_url_chk', sql`char_length(${t.baseUrl}) BETWEEN 1 AND 500`),
+    check('label_print_connections_formats_chk', sql`jsonb_typeof(${t.formats}) = 'array'`),
+    check('label_print_connections_key_version_chk', sql`${t.keyVersion} >= 1`),
+  ],
+);
 
 export const labelBatches = pgTable(
   'label_batches',

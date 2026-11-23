@@ -58,6 +58,13 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
     server.close();
   });
   const base = `http://127.0.0.1:${server.address().port}/api/kept/v1/jobs`;
+  const health = new URL('../health', `${base}/`);
+  assert.equal((await fetch(health)).status, 401);
+  assert.deepEqual(
+    await (await fetch(health, { headers: { Authorization: `Bearer ${token}` } })).json(),
+    { ok: true },
+  );
+  assert.equal(calls, 0);
   const png = await sharp({ create: { width: 96, height: 240, channels: 3, background: 'white' } })
     .png()
     .toBuffer();

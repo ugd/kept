@@ -96,15 +96,19 @@ const systemResolve: Resolve = (host, cb) =>
   dnsLookup(host, { all: true }, (err, addrs) => cb(err, addrs ?? []));
 
 /**
- * A connect-time `lookup` that refuses private addresses (and a name with none). Also used by
+ * A connect-time `lookup` that requires public addresses by default, or private addresses for
+ * explicitly local HTTP. Also used by
  * web push's `https.Agent` (notify/push.ts), which refuses them whatever `ssrf_allow_private`
  * says. Node skips `lookup` for an IP literal: check those first.
  */
-export function guardedLookup(resolve: Resolve = systemResolve): LookupFunction {
+export function guardedLookup(
+  resolve: Resolve = systemResolve,
+  privateOnly = false,
+): LookupFunction {
   return ((hostname: string, options: { all?: boolean }, cb: (...args: unknown[]) => void) => {
     resolve(hostname, (err, addresses) => {
       if (err) return cb(err);
-      const bad = addresses.find((a) => isPrivateAddress(a.address));
+      const bad = addresses.find((a) => isPrivateAddress(a.address) !== privateOnly);
       if (bad || addresses.length === 0)
         return cb(new PrivateAddressError(bad?.address ?? hostname));
       if (options?.all) return cb(null, addresses);
@@ -123,17 +127,24 @@ function privateCause(e: unknown): PrivateAddressError | null {
 }
 
 /**
- * A `fetch` that refuses private addresses (unless `allowPrivate`) and every redirect.
+ * A `fetch` that refuses private addresses by default and every redirect. `privateOnly` restricts
+ * a request to private addresses even when `allowPrivate` is set.
  * `resolve` is for tests (a stubbed DNS answer).
  */
-export function guardedFetch(opts: { allowPrivate: boolean; resolve?: Resolve }): typeof fetch {
-  const dispatcher = opts.allowPrivate
+export function guardedFetch(opts: {
+  allowPrivate: boolean;
+  privateOnly?: boolean;
+  resolve?: Resolve;
+}): typeof fetch {
+  const privateOnly = opts.privateOnly === true;
+  const restrict = privateOnly || !opts.allowPrivate;
+  const dispatcher = !restrict
     ? new Agent()
-    : new Agent({ connect: { lookup: guardedLookup(opts.resolve ?? systemResolve) } });
+    : new Agent({ connect: { lookup: guardedLookup(opts.resolve, privateOnly) } });
   return (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const host = url.hostname.replace(/^\[|\]$/g, '');
-    if (!opts.allowPrivate && isIP(host) !== 0 && isPrivateAddress(host))
+    if (restrict && isIP(host) !== 0 && isPrivateAddress(host) !== privateOnly)
       throw new PrivateAddressError(host);
     try {
       return (await undiciFetch(url, {

@@ -106,6 +106,7 @@ import { Route as AppMovingIdBoxesBoxIdRouteImport } from './routes/_app/moving.
 import { Route as AppSettingsLocationIdEmailInRouteImport } from './routes/_app/settings.location.$id.email-in'
 import { Route as AppSettingsLocationIdGeneralRouteImport } from './routes/_app/settings.location.$id.general'
 import { Route as AppSettingsLocationIdInviteRouteImport } from './routes/_app/settings.location.$id.invite'
+import { Route as AppSettingsLocationIdLabelPrintServerRouteImport } from './routes/_app/settings.location.$id.label-print-server'
 import { Route as AppSettingsLocationIdMembersRouteImport } from './routes/_app/settings.location.$id.members'
 import { Route as AppSettingsLocationIdPaperlessRouteImport } from './routes/_app/settings.location.$id.paperless'
 import { Route as AppSettingsLocationIdShareLinksRouteImport } from './routes/_app/settings.location.$id.share-links'
@@ -605,6 +606,12 @@ const AppSettingsLocationIdInviteRoute =
     path: '/settings/location/$id/invite',
     getParentRoute: () => AppRoute,
   } as any)
+const AppSettingsLocationIdLabelPrintServerRoute =
+  AppSettingsLocationIdLabelPrintServerRouteImport.update({
+    id: '/settings/location/$id/label-print-server',
+    path: '/settings/location/$id/label-print-server',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppSettingsLocationIdMembersRoute =
   AppSettingsLocationIdMembersRouteImport.update({
     id: '/settings/location/$id/members',
@@ -732,6 +739,7 @@ export interface FileRoutesByFullPath {
   '/settings/location/$id/email-in': typeof AppSettingsLocationIdEmailInRoute
   '/settings/location/$id/general': typeof AppSettingsLocationIdGeneralRoute
   '/settings/location/$id/invite': typeof AppSettingsLocationIdInviteRoute
+  '/settings/location/$id/label-print-server': typeof AppSettingsLocationIdLabelPrintServerRoute
   '/settings/location/$id/members': typeof AppSettingsLocationIdMembersRoute
   '/settings/location/$id/paperless': typeof AppSettingsLocationIdPaperlessRoute
   '/settings/location/$id/share-links': typeof AppSettingsLocationIdShareLinksRoute
@@ -832,6 +840,7 @@ export interface FileRoutesByTo {
   '/settings/location/$id/email-in': typeof AppSettingsLocationIdEmailInRoute
   '/settings/location/$id/general': typeof AppSettingsLocationIdGeneralRoute
   '/settings/location/$id/invite': typeof AppSettingsLocationIdInviteRoute
+  '/settings/location/$id/label-print-server': typeof AppSettingsLocationIdLabelPrintServerRoute
   '/settings/location/$id/members': typeof AppSettingsLocationIdMembersRoute
   '/settings/location/$id/paperless': typeof AppSettingsLocationIdPaperlessRoute
   '/settings/location/$id/share-links': typeof AppSettingsLocationIdShareLinksRoute
@@ -937,6 +946,7 @@ export interface FileRoutesById {
   '/_app/settings/location/$id/email-in': typeof AppSettingsLocationIdEmailInRoute
   '/_app/settings/location/$id/general': typeof AppSettingsLocationIdGeneralRoute
   '/_app/settings/location/$id/invite': typeof AppSettingsLocationIdInviteRoute
+  '/_app/settings/location/$id/label-print-server': typeof AppSettingsLocationIdLabelPrintServerRoute
   '/_app/settings/location/$id/members': typeof AppSettingsLocationIdMembersRoute
   '/_app/settings/location/$id/paperless': typeof AppSettingsLocationIdPaperlessRoute
   '/_app/settings/location/$id/share-links': typeof AppSettingsLocationIdShareLinksRoute
@@ -1041,6 +1051,7 @@ export interface FileRouteTypes {
     | '/settings/location/$id/email-in'
     | '/settings/location/$id/general'
     | '/settings/location/$id/invite'
+    | '/settings/location/$id/label-print-server'
     | '/settings/location/$id/members'
     | '/settings/location/$id/paperless'
     | '/settings/location/$id/share-links'
@@ -1141,6 +1152,7 @@ export interface FileRouteTypes {
     | '/settings/location/$id/email-in'
     | '/settings/location/$id/general'
     | '/settings/location/$id/invite'
+    | '/settings/location/$id/label-print-server'
     | '/settings/location/$id/members'
     | '/settings/location/$id/paperless'
     | '/settings/location/$id/share-links'
@@ -1245,6 +1257,7 @@ export interface FileRouteTypes {
     | '/_app/settings/location/$id/email-in'
     | '/_app/settings/location/$id/general'
     | '/_app/settings/location/$id/invite'
+    | '/_app/settings/location/$id/label-print-server'
     | '/_app/settings/location/$id/members'
     | '/_app/settings/location/$id/paperless'
     | '/_app/settings/location/$id/share-links'
@@ -1949,6 +1962,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsLocationIdInviteRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/location/$id/label-print-server': {
+      id: '/_app/settings/location/$id/label-print-server'
+      path: '/settings/location/$id/label-print-server'
+      fullPath: '/settings/location/$id/label-print-server'
+      preLoaderRoute: typeof AppSettingsLocationIdLabelPrintServerRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/location/$id/members': {
       id: '/_app/settings/location/$id/members'
       path: '/settings/location/$id/members'
@@ -2186,6 +2206,7 @@ interface AppRouteChildren {
   AppSettingsLocationIdEmailInRoute: typeof AppSettingsLocationIdEmailInRoute
   AppSettingsLocationIdGeneralRoute: typeof AppSettingsLocationIdGeneralRoute
   AppSettingsLocationIdInviteRoute: typeof AppSettingsLocationIdInviteRoute
+  AppSettingsLocationIdLabelPrintServerRoute: typeof AppSettingsLocationIdLabelPrintServerRoute
   AppSettingsLocationIdMembersRoute: typeof AppSettingsLocationIdMembersRoute
   AppSettingsLocationIdPaperlessRoute: typeof AppSettingsLocationIdPaperlessRoute
   AppSettingsLocationIdShareLinksRoute: typeof AppSettingsLocationIdShareLinksRoute
@@ -2250,6 +2271,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsLocationIdEmailInRoute: AppSettingsLocationIdEmailInRoute,
   AppSettingsLocationIdGeneralRoute: AppSettingsLocationIdGeneralRoute,
   AppSettingsLocationIdInviteRoute: AppSettingsLocationIdInviteRoute,
+  AppSettingsLocationIdLabelPrintServerRoute:
+    AppSettingsLocationIdLabelPrintServerRoute,
   AppSettingsLocationIdMembersRoute: AppSettingsLocationIdMembersRoute,
   AppSettingsLocationIdPaperlessRoute: AppSettingsLocationIdPaperlessRoute,
   AppSettingsLocationIdShareLinksRoute: AppSettingsLocationIdShareLinksRoute,

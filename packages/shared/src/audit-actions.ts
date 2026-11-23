@@ -140,6 +140,8 @@ export const AUDIT_ACTIONS = [
   'label_batch.dismiss',
   'labels.printed',
   'labels.print_server',
+  'labels.print_connection_saved',
+  'labels.print_connection_removed',
   'loan.create',
   'loan.delete',
   'loan.lost',

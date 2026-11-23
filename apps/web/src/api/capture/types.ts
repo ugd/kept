@@ -445,6 +445,20 @@ export type InboxRestoreResult = { outcome: 'applied' | 'needs_review' | 'droppe
 
 // ----- labels ----------------------------------------------------------------------------------
 
+export type LabelPrintFormat = {
+  id: string;
+  widthMm: number;
+  printableWidthMm?: number;
+  heightMm: number;
+  dotsPerMm: number;
+};
+
+export type LabelPrintConnection = {
+  url: string;
+  formats: LabelPrintFormat[];
+  source: 'settings' | 'file';
+};
+
 export type LabelBatchKind = 'things' | 'places' | 'blank';
 
 /** POST /api/v1/labels/batches. */

@@ -54,6 +54,8 @@ export const capturePaths = {
   labelBatchDismiss: (id: string) => `${V1}/labels/batches/${seg(id)}/dismiss`,
   labelSummary: `${V1}/labels/summary`,
   labelPrintServer: `${V1}/labels/print-server`,
+  labelPrintSettings: (id: string) => `${V1}/locations/${seg(id)}/label-print-server`,
+  labelPrintCheck: (id: string) => `${V1}/locations/${seg(id)}/label-print-server/check`,
   labelServerPreview: (id: string) => `${V1}/labels/batches/${seg(id)}/print-server/preview`,
   labelServerJobs: (id: string) => `${V1}/labels/batches/${seg(id)}/print-server/jobs`,
   labelServerJob: (id: string, requestId: string) =>
@@ -144,6 +146,8 @@ export const CAPTURE_METHODS: Record<keyof typeof capturePaths, readonly Method[
   labelBatchDismiss: ['POST'],
   labelSummary: ['GET'],
   labelPrintServer: ['GET'],
+  labelPrintSettings: ['GET', 'PUT', 'DELETE'],
+  labelPrintCheck: ['POST'],
   labelServerPreview: ['GET'],
   labelServerJobs: ['POST'],
   labelServerJob: ['GET'],

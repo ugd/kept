@@ -24,6 +24,7 @@ import {
   printJobId,
   renderPrintLabel,
 } from './print-server.js';
+import { registerPrintSettings } from './print-settings.js';
 import {
   CreateBatchBody,
   CreateBatchResultSchema,
@@ -119,7 +120,11 @@ async function requireLabelsOn(tx: Tx, client: pg.ClientBase, locationId: string
 export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<void> {
   const { pools } = deps;
   const publicUrl = deps.env.KEPT_PUBLIC_URL;
-  const printer = await loadPrintServer(deps.env.KEPT_LABEL_PRINT_CONFIG_FILE);
+  const { formatsFor, printerFor } = registerPrintSettings(
+    app,
+    deps,
+    await loadPrintServer(deps.env.KEPT_LABEL_PRINT_CONFIG_FILE),
+  );
   const ctxOf = (req: FastifyRequest, tx: Tx, client: pg.PoolClient, scope: Scope): Ctx => ({
     tx,
     client,
@@ -231,21 +236,19 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
 
   async function printableBatch(client: pg.ClientBase, id: string) {
     const batch = await getBatch(client, publicUrl, id.toLowerCase());
-    if (!printer?.formatsFor(batch.locationId).length) throw notFound();
     await requireRole(client, batch.locationId, 'labels.use');
-    return { batch, printer };
+    return batch;
   }
 
-  async function printableLabel(
-    client: pg.ClientBase,
-    id: string,
+  function printableLabel(
+    batch: Awaited<ReturnType<typeof printableBatch>>,
+    formats: PrintFormat[],
     choice: z.infer<typeof PrintChoice>,
   ) {
-    const { batch, printer } = await printableBatch(client, id);
     const label = batch.labels.find((item) => item.code === choice.code);
-    const format = printer.formatsFor(batch.locationId).find((item) => item.id === choice.formatId);
+    const format = formats.find((item) => item.id === choice.formatId);
     if (!label || !format) throw notFound();
-    return { batch, printer, label, format };
+    return { label, format };
   }
 
   app.get(
@@ -261,7 +264,7 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
         const id = req.query.locationId.toLowerCase();
         await requireLabelsOn(tx, client, id);
         await requireRole(client, id, 'labels.use');
-        return { formats: printer?.formatsFor(id) ?? [] };
+        return { formats: await formatsFor(client, id) };
       }),
   );
 
@@ -277,9 +280,10 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
       },
     },
     async (req, reply) => {
-      const { label, format } = await scopedRead(pools, req, (_tx, client) =>
-        printableLabel(client, req.params.id, req.query),
-      );
+      const { label, format } = await scopedRead(pools, req, async (_tx, client) => {
+        const batch = await printableBatch(client, req.params.id);
+        return printableLabel(batch, await formatsFor(client, batch.locationId), req.query);
+      });
       reply.header('cache-control', 'no-store');
       return { png: (await renderPrintLabel(label, format)).toString('base64') };
     },
@@ -297,11 +301,9 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
     },
     (req, reply) =>
       scopedWrite(pools, req, reply, async (tx, client, scope) => {
-        const { batch, printer, label, format } = await printableLabel(
-          client,
-          req.params.id,
-          req.body,
-        );
+        const batch = await printableBatch(client, req.params.id);
+        const { printer, formats } = await printerFor(batch.locationId);
+        const { label, format } = printableLabel(batch, formats, req.body);
         const jobId = printJobId(scope.userId, batch.id, req.body.requestId.toLowerCase());
         // Replays after an uncertain network response use the same physical job identifier.
         const body = await printer.submit(jobId, format, await renderPrintLabel(label, format));
@@ -327,14 +329,11 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
       },
     },
     async (req, reply) => {
-      const { batch, printer, userId } = await scopedRead(
-        pools,
-        req,
-        async (_tx, client, scope) => ({
-          ...(await printableBatch(client, req.params.id)),
-          userId: scope.userId,
-        }),
-      );
+      const { batch, userId } = await scopedRead(pools, req, async (_tx, client, scope) => ({
+        batch: await printableBatch(client, req.params.id),
+        userId: scope.userId,
+      }));
+      const { printer } = await printerFor(batch.locationId);
       reply.header('cache-control', 'no-store');
       return printer.status(printJobId(userId, batch.id, req.params.requestId.toLowerCase()));
     },

@@ -362,6 +362,7 @@ const KEPT_FUNCTION_EXECUTE: Record<string, string[]> = {
   // 1.x (0135): a location's Paperless-ngx connection with its sealed token, for the server
   // after kept_app's checks; and the trigger that drops a moved thing's links.
   'kept.paperless_config(uuid)': SYSTEM_ONLY,
+  'kept.label_print_config(uuid)': SYSTEM_ONLY,
   'kept.drop_moved_paperless_links()': OWNER_ONLY,
   // Migration 0080: an archive import's target, the prune-imports doors, and the end of a
   // former admin's unfinished exports and imports.

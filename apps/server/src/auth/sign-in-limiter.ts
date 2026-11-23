@@ -58,6 +58,7 @@ export function limiterKey(
     // 1.x (D248): testing a location's Paperless connection, and searching it, per person.
     | 'paperless-check'
     | 'paperless-search'
+    | 'label-print-check'
     // Starts of "Set up again" for the authenticator app, per person.
     | 'two-factor-setup',
   ...parts: string[]
