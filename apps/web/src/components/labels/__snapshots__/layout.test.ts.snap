@@ -194,6 +194,28 @@ exports[`placeLabels per stock > thermal_40x30: the first page, cell by cell 1`]
 }
 `;
 
+exports[`placeLabels per stock > thermal_40x40: the first page, cell by cell 1`] = `
+{
+  "cells": 1,
+  "first": {
+    "cell": 0,
+    "col": 0,
+    "row": 0,
+    "x": 0,
+    "y": 0,
+  },
+  "last": {
+    "cell": 0,
+    "col": 0,
+    "row": 0,
+    "x": 0,
+    "y": 0,
+  },
+  "page": "@page { size: 40mm 40mm; margin: 0; }",
+  "second": undefined,
+}
+`;
+
 exports[`placeLabels per stock > thermal_50x30: the first page, cell by cell 1`] = `
 {
   "cells": 1,

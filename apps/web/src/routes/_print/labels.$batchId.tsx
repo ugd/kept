@@ -209,6 +209,7 @@ function PrintLabelsPage() {
           <ServerPrint
             key={data.id}
             batch={data}
+            stock={stock}
             formats={server.data.formats}
             onPrinted={markPrintedHere}
           />

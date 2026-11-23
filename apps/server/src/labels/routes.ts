@@ -16,13 +16,13 @@ import { requireMembership } from '../locations/access.js';
 import { type Ctx, requireRole } from '../things/service.js';
 import { ClaimTarget, claimableCode, claimLabel, labelClaimed } from './claim.js';
 import { formerHostHook } from './former-hosts.js';
+import { renderPrintLabel } from './print-label.js';
 import {
   FormatId,
   loadPrintServer,
   PrintFormat,
   PrintServerState,
   printJobId,
-  renderPrintLabel,
 } from './print-server.js';
 import { registerPrintSettings } from './print-settings.js';
 import {

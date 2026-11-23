@@ -65,6 +65,7 @@ const tape = (width: number, length: number, qr: boolean): LabelStock => ({
 export const LABEL_STOCKS: readonly LabelStock[] = Object.freeze([
   roll('thermal_50x30', 50, 30, 'Thermal 50 × 30 mm', 'حراري 50 × 30 مم'),
   roll('thermal_40x30', 40, 30, 'Thermal 40 × 30 mm', 'حراري 40 × 30 مم'),
+  roll('thermal_40x40', 40, 40, 'Thermal 40 × 40 mm', 'حراري 40 × 40 مم'),
   roll('thermal_62x29', 62, 29, 'Brother 62 × 29 mm', 'براذر 62 × 29 مم'),
   tape(9, 40, false),
   tape(12, 50, false),

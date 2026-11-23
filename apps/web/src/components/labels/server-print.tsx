@@ -1,4 +1,4 @@
-import { newId, printedCode } from '@kept/shared';
+import { type LabelStock, newId, printedCode } from '@kept/shared';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -74,10 +74,12 @@ function rememberPrint(key: string, job?: PrintRequest) {
 
 export function ServerPrint({
   batch,
+  stock,
   formats,
   onPrinted,
 }: {
   batch: LabelBatch;
+  stock: LabelStock;
   formats: LabelPrintFormat[];
   onPrinted: () => void;
 }) {
@@ -91,7 +93,12 @@ export function ServerPrint({
   const [request, setRequest] = useState(restored);
   const code =
     batch.labels.find((label) => label.code === selectedCode)?.code ?? batch.labels[0]?.code;
-  const format = formats.find((item) => item.id === selectedFormat) ?? formats[0];
+  const format =
+    formats.find(({ id }) => id === selectedFormat) ??
+    formats.find(
+      ({ widthMm, heightMm }) => widthMm === stock.cell.w && heightMm === stock.cell.h,
+    ) ??
+    formats[0];
   const preview = useQuery({
     queryKey: ['labels', 'print-server', batch.id, code, format],
     enabled: !!(code && format),
@@ -181,7 +188,13 @@ export function ServerPrint({
         />
       </div>
       {preview.data ? <Preview png={preview.data.png} /> : null}
-      {preview.isError ? <Notice tone="danger">{errorText(preview.error)}</Notice> : null}
+      {preview.isError ? (
+        <Notice tone="danger">
+          {isApiError(preview.error) && preview.error.code === 'validation' && preview.error.hint
+            ? preview.error.hint
+            : errorText(preview.error)}
+        </Notice>
+      ) : null}
       <div>
         <Button onPress={print} isPending={send.isPending} isDisabled={blocked || !preview.data}>
           {retry ? <Trans>Retry print request</Trans> : <Trans>Print on server</Trans>}

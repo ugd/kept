@@ -1,12 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { printedCode, SHORT_CODE } from '@kept/shared';
-import sharp from 'sharp';
-import { encode } from 'uqr';
 import { z } from 'zod';
 import { AppError, conflict, invalid, notFound } from '../http/errors.js';
 import { guardedFetch, PrivateAddressError } from '../net/ssrf.js';
-import { drawShortCode } from './print-short-code.js';
 
 export const FormatId = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/);
 export const PrintFormat = z
@@ -149,43 +145,4 @@ export function printServer(
       call('jobs', PrintServerState, { id, format, png: png.toString('base64') }),
     status: (id: string) => call(`jobs/${id}`, PrintServerState),
   };
-}
-
-/** Render the same immutable Kept URL and short ID for the preview and the job. */
-export async function renderPrintLabel(label: { code: string; url: string }, format: PrintFormat) {
-  if (!SHORT_CODE.test(label.code)) throw invalid();
-  const width = Math.round((format.printableWidthMm ?? format.widthMm) * format.dotsPerMm);
-  const height = Math.round(format.heightMm * format.dotsPerMm);
-  const matrix = encode(label.url, { ecc: 'M', border: 4 }).data;
-  const text = printedCode(label.code);
-  const charactersWide = text.length * 6 - 1;
-  const textScale = Math.min(
-    Math.max(1, Math.round(format.dotsPerMm / 4)),
-    Math.floor((width - 4) / charactersWide),
-  );
-  const textSpace = 7 * textScale + 4;
-  const scale = Math.floor(Math.min(width - 4, height - textSpace - 4) / matrix.length);
-  if (scale < 2)
-    throw invalid('The label is too small to fit this QR code at the printer resolution.');
-
-  const side = matrix.length * scale;
-  const startX = Math.floor((width - side) / 2);
-  const startY = Math.floor((height - side - textSpace) / 2);
-  let path = '';
-  matrix.forEach((row, y) => {
-    row.forEach((dark, x) => {
-      if (dark) path += `M${startX + x * scale} ${startY + y * scale}h${scale}v${scale}h-${scale}z`;
-    });
-  });
-  path += drawShortCode(
-    text,
-    textScale,
-    Math.floor((width - charactersWide * textScale) / 2),
-    startY + side + 2,
-  );
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-    <rect width="100%" height="100%" fill="#fff"/>
-    <path d="${path}" fill="#000" shape-rendering="crispEdges"/>
-  </svg>`;
-  return sharp(Buffer.from(svg)).flatten({ background: '#fff' }).threshold(128).png().toBuffer();
 }

@@ -6,6 +6,7 @@ describe('LABEL_STOCKS', () => {
     expect(LABEL_STOCKS.map((s) => s.key)).toEqual([
       'thermal_50x30',
       'thermal_40x30',
+      'thermal_40x40',
       'thermal_62x29',
       'tape_9',
       'tape_12',

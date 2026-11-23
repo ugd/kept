@@ -1,6 +1,6 @@
 # Printing Kept labels on a NIIMBOT B21S-C2B
 
-Run the bridge on the computer that can reach the printer. Kept renders the QR and short ID at the chosen roll size and sends a PNG to the bridge. A phone needs only its ordinary Kept session. The connection key stays on the Kept server and the bridge.
+Run the bridge on the computer that can reach the printer. Kept renders the label at the chosen roll size and sends a PNG to the bridge. The 50 × 30 mm and 40 × 40 mm formats put the QR on the left and the short ID, name and location on the right. A phone needs only its ordinary Kept session. The connection key stays on the Kept server and the bridge.
 
 ## Start the bridge
 
@@ -12,7 +12,7 @@ Start the bridge with `npm start`. It listens on loopback by default. If Kept an
 
 Open **Settings → Locations → your location → Print server** as an owner or admin with Labels enabled. Enter the bridge's base URL and paste the same key as `BRIDGE_TOKEN`. Kept must be able to reach that URL from its server. For a LAN or VPN address, the instance admin can enable private addresses in **Admin → Settings**. Use HTTPS for a public address. Plain HTTP is available with private addresses enabled and a private destination.
 
-For a **50 × 30 mm** NIIMBOT roll, set the roll width to **50**, label height to **30**, printable width to **48**, and resolution to **8 dots/mm**. This makes a 384 × 240 dot raster. Width is across the printhead and height is in the feed direction. Add the formats you use and select **Save**, then **Test connection**. The test checks the bridge and key without submitting a job. The first format is the initial print selection.
+For a **50 × 30 mm** NIIMBOT roll, enter a width of **50**, height of **30**, printable width of **48**, and resolution of **8 dots/mm**. This makes a 384 × 240 dot raster. For a **40 × 40 mm** roll, add a format with width **40**, height **40**, printable width **40**, and resolution **8 dots/mm**. This makes a 320 × 320 dot raster. Width is across the printhead and height is in the feed direction. Select **Save**, then **Test connection**. The test checks the bridge and key without submitting a job. The print picker starts with the format that matches the batch’s stock when available.
 
 ### File-based configuration
 
@@ -26,7 +26,7 @@ For a file-managed Kept installation, save a server-side `label-print.json` with
   "formats": [
     { "id": "50x30", "widthMm": 50, "printableWidthMm": 48, "heightMm": 30, "dotsPerMm": 8 },
     { "id": "12x30", "widthMm": 12, "heightMm": 30, "dotsPerMm": 8 },
-    { "id": "40x30", "widthMm": 40, "heightMm": 30, "dotsPerMm": 8 }
+    { "id": "40x40", "widthMm": 40, "heightMm": 40, "dotsPerMm": 8 }
   ]
 }
 ```

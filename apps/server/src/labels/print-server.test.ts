@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
-import { loadPrintServer, PrintFormat, renderPrintLabel } from './print-server.js';
+import { renderPrintLabel } from './print-label.js';
+import { loadPrintServer, PrintFormat } from './print-server.js';
 
 const locationId = 'a42fb121-67a9-47bf-81a7-fee06306712d';
 const format = { id: '12x30', widthMm: 12, heightMm: 30, dotsPerMm: 8 };
@@ -38,6 +39,36 @@ describe('server label printing', () => {
     expect(await sharp(image).metadata()).toMatchObject({ width: 384, height: 240 });
     expect(roll.widthMm).toBe(50);
     expect(PrintFormat.safeParse({ ...roll, printableWidthMm: 51 }).success).toBe(false);
+  });
+
+  it.each([
+    { id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30 },
+    { id: '40x40', widthMm: 40, printableWidthMm: 40, heightMm: 40 },
+  ])('fits the QR, code, name and location on $id stock', async (stock) => {
+    const roll = { ...stock, dotsPerMm: 8 };
+    const withDetails = { ...label, name: 'Dulap', path: 'Camera mea' };
+    const raw = async (png: Buffer) =>
+      sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await raw(await renderPrintLabel(withDetails, roll));
+    const { data: codeOnly } = await raw(await renderPrintLabel(label, roll));
+    const { data: withoutLocation } = await raw(
+      await renderPrintLabel({ ...withDetails, path: '' }, roll),
+    );
+    const { width, height } = info;
+    expect([width, height]).toEqual([stock.printableWidthMm * 8, stock.heightMm * 8]);
+    expect(new Set(data)).toEqual(new Set([0, 255]));
+    const left = (ink: Buffer, y: number) => ink.subarray(y * width, y * width + width / 2);
+    const right = (ink: Buffer, y: number) => ink.subarray(y * width + width / 2, (y + 1) * width);
+    const text = (ink: Buffer) => Array.from({ length: height }, (_, y) => right(ink, y));
+    expect(left(data, Math.floor(height / 2)).includes(0)).toBe(true);
+    expect(text(data).some((row) => row.includes(0))).toBe(true);
+    expect(text(data)).not.toEqual(text(codeOnly));
+    expect(text(data)).not.toEqual(text(withoutLocation));
+    for (let y = 0; y < height; y++) {
+      expect(left(data, y)).toEqual(left(codeOnly, y));
+      expect(data[y * width]).toBe(255);
+      expect(data[(y + 1) * width - 1]).toBe(255);
+    }
   });
 
   it('uses a server-side credential and an idempotent job identifier for the configured location', async () => {

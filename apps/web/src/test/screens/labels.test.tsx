@@ -517,6 +517,33 @@ describe('the print view', () => {
     ...over,
   });
 
+  it('previews 40 × 40 mm on the server when that roll is selected in the print view', async () => {
+    const state = ownerScenario();
+    const saved = batch();
+    state.capture.labelBatches.unshift(saved);
+    const preview = vi.fn();
+    await renderApp(`/labels/${saved.id}?stock=thermal_40x40`, {
+      state,
+      setup(mock) {
+        mock.on('GET', capturePaths.labelPrintServer, () => ({
+          formats: [
+            { id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30, dotsPerMm: 8 },
+            { id: '40x40', widthMm: 40, heightMm: 40, dotsPerMm: 8 },
+          ],
+        }));
+        mock.on('GET', capturePaths.labelServerPreview(':id'), ({ query }) => {
+          preview(query.get('formatId'));
+          return { png: 'aGVsbG8=' };
+        });
+      },
+    });
+    const section = await screen.findByRole('region', { name: 'Print server' });
+    expect(within(section).getByRole('combobox', { name: 'Roll format' })).toHaveValue(
+      '40 × 40 mm',
+    );
+    await waitFor(() => expect(preview).toHaveBeenCalledWith('40x40'));
+  });
+
   it('keeps an Arabic name in its own direction and the code left to right, in Arabic', async () => {
     const state = ownerScenario();
     state.capture.labelBatches.unshift(batch());

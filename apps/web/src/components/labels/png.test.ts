@@ -121,6 +121,7 @@ describe('labelPixelSize', () => {
     expect(Object.fromEntries(LABEL_STOCKS.map((s) => [s.key, labelPixelSize(s)]))).toEqual({
       thermal_50x30: { width: 591, height: 354 },
       thermal_40x30: { width: 472, height: 354 },
+      thermal_40x40: { width: 472, height: 472 },
       thermal_62x29: { width: 732, height: 343 },
       tape_9: { width: 472, height: 106 },
       tape_12: { width: 591, height: 142 },
