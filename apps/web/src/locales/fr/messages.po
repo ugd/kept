@@ -29444,3 +29444,7 @@ msgstr "Utilisez l’adresse de la passerelle qui tourne à proximité de l’im
 #: src/routes/_print/labels.$batchId.tsx
 msgid "Browser printing"
 msgstr "Imprimer depuis le navigateur"
+
+#: src/components/labels/server-print.tsx
+msgid "Copies"
+msgstr "Exemplaires"

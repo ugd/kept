@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
-import { newId } from '@kept/shared';
+import { MAX_LABEL_PRINT_COPIES, newId } from '@kept/shared';
 import sharp from 'sharp';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import type { TestApp } from '../../test/app.js';
@@ -11,12 +11,18 @@ import { fixedSecretKeys } from '../crypto/keyring.js';
 
 const token = 'test-only-label-print-key';
 const formats = [{ id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30, dotsPerMm: 8 }];
-const submissions: { id: string; format: (typeof formats)[number]; png: string }[] = [];
+const submissions: {
+  id: string;
+  format: (typeof formats)[number];
+  png: string;
+  copies?: number;
+}[] = [];
 const bridge = createServer(async (req, res) => {
   const answer = (status: number, body: object) =>
     res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
   if (req.headers.authorization !== `Bearer ${token}`) return answer(401, { ok: false });
-  if (req.method === 'GET' && req.url === '/api/kept/v1/health') return answer(200, { ok: true });
+  if (req.method === 'GET' && req.url === '/api/kept/v1/health')
+    return answer(200, { ok: true, maxCopies: MAX_LABEL_PRINT_COPIES });
   if (req.method === 'POST' && req.url === '/api/kept/v1/jobs') {
     let payload = '';
     for await (const chunk of req) payload += chunk;
@@ -87,7 +93,7 @@ it('saves and removes a location print connection while keeping its token out of
     db,
     "INSERT INTO public.instance_settings (key, value) VALUES ('ssrf_allow_private', 'true')",
   );
-  expect((await check()).json()).toEqual({ ok: true });
+  expect((await check()).json()).toEqual({ ok: true, maxCopies: MAX_LABEL_PRINT_COPIES });
   expect(submissions).toHaveLength(0);
   const sealed = await own<{ config_ciphertext: unknown }>(
     db,
@@ -103,14 +109,20 @@ it('saves and removes a location print connection while keeping its token out of
   });
   expect(created.statusCode, created.body).toBe(201);
   const { batch } = created.json();
-  const choice = { formatId: '50x30', code: batch.labels[0].code, requestId: newId() };
+  const choice = { formatId: '50x30', code: batch.labels[0].code, requestId: newId(), copies: 3 };
   const jobs = `/api/v1/labels/batches/${batch.id}/print-server/jobs`;
+  expect(
+    (await call(app, jobs, { as: louis, body: { ...choice, copies: MAX_LABEL_PRINT_COPIES + 1 } }))
+      .statusCode,
+  ).toBe(400);
+  expect(submissions).toHaveLength(0);
   expect((await call(app, jobs, { as: louis, body: choice })).json()).toEqual({ state: 'queued' });
   expect((await call(app, `${jobs}/${choice.requestId}`, { as: louis })).json()).toEqual({
     state: 'done',
   });
   expect(submissions).toHaveLength(1);
   const sent = submissions[0];
+  expect(sent?.copies).toBe(3);
   expect(sent?.format).toEqual(formats[0]);
   expect(await sharp(Buffer.from(sent?.png ?? '', 'base64')).metadata()).toMatchObject({
     width: 384,

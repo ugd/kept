@@ -4,13 +4,27 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { renderPrintLabel } from './print-label.js';
-import { loadPrintServer, PrintFormat } from './print-server.js';
+import { loadPrintServer, PrintFormat, printServer } from './print-server.js';
 
 const locationId = 'a42fb121-67a9-47bf-81a7-fee06306712d';
 const format = { id: '12x30', widthMm: 12, heightMm: 30, dotsPerMm: 8 };
 const label = { code: 'ABC123', url: 'https://kept.example.org/l/ABC123' };
 
 describe('server label printing', () => {
+  it('requires the bridge to advertise copy support before sending a multi-copy job', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ ok: true }));
+    const printer = printServer(
+      { url: 'https://bridge.example.org', token: 'test-only-token' },
+      { allowPrivate: false },
+      fetch,
+    );
+    await expect(printer.submit('ab'.repeat(16), format, Buffer.alloc(0), 3)).rejects.toMatchObject(
+      { code: 'validation' },
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe('https://bridge.example.org/api/kept/v1/health');
+  });
+
   it('renders an opaque 96 × 240 raster for 12 × 30 mm at eight dots per millimetre', async () => {
     const png = await renderPrintLabel(label, format);
     const { data, info } = await sharp(png).greyscale().raw().toBuffer({ resolveWithObject: true });

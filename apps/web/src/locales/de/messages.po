@@ -29444,3 +29444,7 @@ msgstr "Verwende die Adresse des Dienstes in der Nähe des Druckers. Der Kept-Se
 #: src/routes/_print/labels.$batchId.tsx
 msgid "Browser printing"
 msgstr "Im Browser drucken"
+
+#: src/components/labels/server-print.tsx
+msgid "Copies"
+msgstr "Kopien"

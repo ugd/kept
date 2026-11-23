@@ -44,6 +44,7 @@ for (const format of [
 test('the bridge validates the raster, authorizes Kept and prints a retry just once', async (t) => {
   const token = 'test-only-bridge-token';
   let printed;
+  let copiesPrinted;
   let calls = 0;
   let finish;
   const printing = new Promise((resolve) => {
@@ -52,8 +53,9 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
   const server = makeServer({
     token,
     database: ':memory:',
-    async printLabel(png) {
+    async printLabel(png, copies) {
       printed = png;
+      copiesPrinted = copies;
       calls += 1;
       await printing;
     },
@@ -68,7 +70,7 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
   assert.equal((await fetch(health)).status, 401);
   assert.deepEqual(
     await (await fetch(health, { headers: { Authorization: `Bearer ${token}` } })).json(),
-    { ok: true },
+    { ok: true, maxCopies: 0x7fff },
   );
   assert.equal(calls, 0);
   const png = await sharp({ create: { width: 96, height: 240, channels: 3, background: 'white' } })
@@ -79,6 +81,7 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
     id,
     format: { id: '12x30', widthMm: 12, heightMm: 30, dotsPerMm: 8 },
     png: png.toString('base64'),
+    copies: 3,
   };
   const post = (body, auth = token) =>
     fetch(base, {
@@ -88,12 +91,15 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
     });
   assert.equal((await post(job, 'wrong')).status, 401);
   assert.equal((await post({ ...job, format: { ...job.format, widthMm: 30 } })).status, 422);
+  for (const copies of [0, 1.5, 0x8000]) assert.equal((await post({ ...job, copies })).status, 422);
   assert.equal((await post(job)).status, 202);
   assert.equal((await post(job)).status, 200);
+  assert.equal((await post({ ...job, copies: 2 })).status, 409);
   assert.equal((await post({ ...job, id: 'aa'.repeat(16) })).status, 409);
   finish();
   const status = await fetch(`${base}/${id}`, { headers: { Authorization: `Bearer ${token}` } });
   assert.deepEqual(await status.json(), { state: 'done' });
   assert.equal(calls, 1);
+  assert.equal(copiesPrinted, 3);
   assert.deepEqual(printed, png);
 });

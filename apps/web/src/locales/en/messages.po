@@ -29444,3 +29444,7 @@ msgstr "Use the address of the bridge running near the printer. The Kept server 
 #: src/routes/_print/labels.$batchId.tsx
 msgid "Browser printing"
 msgstr "Browser printing"
+
+#: src/components/labels/server-print.tsx
+msgid "Copies"
+msgstr "Copies"

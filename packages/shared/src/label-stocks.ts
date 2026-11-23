@@ -18,6 +18,9 @@
 
 import type { Names } from './builtin-types.js';
 
+/** The B1 task reads the completed copy count as a signed 16-bit number. */
+export const MAX_LABEL_PRINT_COPIES = 0x7fff;
+
 export type LabelStock = {
   readonly key: string;
   readonly names: Names;

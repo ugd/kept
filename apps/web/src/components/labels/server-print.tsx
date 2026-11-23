@@ -1,4 +1,4 @@
-import { type LabelStock, newId, printedCode } from '@kept/shared';
+import { type LabelStock, MAX_LABEL_PRINT_COPIES, newId, printedCode } from '@kept/shared';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -8,14 +8,27 @@ import { api, isApiError } from '@/api/client';
 import { qs } from '@/api/inventory/paths';
 import { PrinterIcon } from '@/components/icons';
 import { LoadingRows, Notice, useErrorText } from '@/components/page';
+import { parseNumber } from '@/components/things/form-model';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
+import { Dialog, DialogFooter, Modal } from '@/components/ui/dialog';
+import { TextField } from '@/components/ui/text-field';
 import { useFormat } from '@/lib/format';
 import { useConfirmPrinted } from './printed-ok';
 
 type Job = { state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain' };
 type Choice = { code: string; formatId: string };
-type PrintRequest = Choice & { requestId: string };
+type PrintRequest = Choice & { requestId: string; copies: number };
+type CopyPrompt = { value: string; choices: boolean };
+
+function validCopies(copies: unknown): copies is number {
+  return (
+    typeof copies === 'number' &&
+    Number.isInteger(copies) &&
+    copies >= 1 &&
+    copies <= MAX_LABEL_PRINT_COPIES
+  );
+}
 
 export function usePrintServer(locationId: string | undefined) {
   return useQuery({
@@ -57,9 +70,15 @@ function restorePrint(key: string): PrintRequest | undefined {
     if (
       typeof saved?.requestId === 'string' &&
       typeof saved.code === 'string' &&
-      typeof saved.formatId === 'string'
+      typeof saved.formatId === 'string' &&
+      (saved.copies === undefined || validCopies(saved.copies))
     )
-      return saved as PrintRequest;
+      return {
+        requestId: saved.requestId,
+        code: saved.code,
+        formatId: saved.formatId,
+        copies: saved.copies ?? 1,
+      };
   } catch {
     // Printing is still available on devices that block session storage.
   }
@@ -79,6 +98,7 @@ export function ServerPrint({
   stock,
   formats,
   browserMode,
+  initiallyOpen = false,
   showServer,
   children,
 }: {
@@ -86,6 +106,7 @@ export function ServerPrint({
   stock: LabelStock;
   formats: LabelPrintFormat[];
   browserMode: boolean;
+  initiallyOpen?: boolean;
   showServer: () => void;
   children: (action: ReactNode, details: ReactNode) => ReactNode;
 }) {
@@ -98,18 +119,22 @@ export function ServerPrint({
   const [selectedCode, setCode] = useState(restored?.code);
   const [selectedFormat, setFormat] = useState(restored?.formatId);
   const [request, setRequest] = useState(restored);
+  const [prompt, setPrompt] = useState<CopyPrompt | null>(() =>
+    initiallyOpen ? { value: '1', choices: true } : null,
+  );
   const code =
     batch.labels.find((label) => label.code === selectedCode)?.code ?? batch.labels[0]?.code;
   const matchingFormats = formats.filter(
     ({ widthMm, heightMm }) => widthMm === stock.cell.w && heightMm === stock.cell.h,
   );
-  const chosenFormat = browserMode ? undefined : formats.find(({ id }) => id === selectedFormat);
+  const chosenFormat =
+    browserMode && !prompt ? undefined : formats.find(({ id }) => id === selectedFormat);
   const format = chosenFormat ?? matchingFormats[0] ?? formats[0];
   const direct =
     batch.labels.length === 1 && (matchingFormats.length === 1 || formats.length === 1);
   const preview = useQuery({
     queryKey: ['labels', 'print-server', batch.id, code, format],
-    enabled: !!(code && format) && (!browserMode || direct),
+    enabled: !!(code && format) && (!browserMode || !!prompt),
     queryFn: ({ signal }) =>
       api.get<{ png: string }>(
         capturePaths.labelServerPreview(batch.id) + qs({ code, formatId: format?.id }),
@@ -122,6 +147,9 @@ export function ServerPrint({
       api.post<Job>(capturePaths.labelServerJobs(batch.id), job, {
         'Idempotency-Key': job.requestId,
       }),
+    onError: (error) => {
+      if (isApiError(error) && error.code === 'validation') rememberPrint(storageKey);
+    },
   });
   const tracking =
     !!request &&
@@ -138,15 +166,21 @@ export function ServerPrint({
   const result = status.data ?? send.data;
   const blocked =
     send.isPending || (tracking && status.isPending) || (active(result) && !status.isError);
+  const rejected = isApiError(send.error) && send.error.code === 'validation';
   const retry =
-    request?.code === code && request?.formatId === format?.id && (send.isError || status.isError);
+    request?.code === code &&
+    request?.formatId === format?.id &&
+    ((send.isError && !rejected) || status.isError);
   useEffect(() => {
     if (!send.isPending && result && !active(result)) rememberPrint(storageKey);
   }, [result, send.isPending, storageKey]);
 
   if (!code || !format) return children(null, null);
-  const print = () => {
-    const next = retry && request ? request : { requestId: newId(), code, formatId: format.id };
+  const describeError = (error: unknown) =>
+    isApiError(error) && error.code === 'validation' && error.hint ? error.hint : errorText(error);
+  const print = (copies: number) => {
+    const next =
+      retry && request ? request : { requestId: newId(), code, formatId: format.id, copies };
     const unknownJob = isApiError(status.error) && status.error.status === 404;
     if (retry && status.isError && !unknownJob) {
       void status.refetch();
@@ -157,23 +191,24 @@ export function ServerPrint({
     }
   };
   const onPress = () => {
-    if (!browserMode || (direct && preview.data)) {
-      setFormat(format.id);
-      print();
+    setFormat(format.id);
+    if (retry && request) {
+      print(request.copies);
+      if (browserMode) showServer();
+    } else {
+      setPrompt({ value: '1', choices: browserMode && !direct });
     }
-    if (browserMode) showServer();
   };
   const action = (
     <Button
       onPress={onPress}
       isPending={send.isPending}
-      isDisabled={blocked || (browserMode ? direct && preview.isPending : !preview.data)}
+      isDisabled={blocked || (!browserMode && !retry && !preview.data)}
     >
       <PrinterIcon className="size-5" />
       {retry ? <Trans>Retry print request</Trans> : <Trans>Print on server</Trans>}
     </Button>
   );
-  if (browserMode) return children(action, null);
   const pickLabel = batch.labels.length > 1;
   const pickFormat = formats.length > 1;
   const rollName = ({ widthMm, heightMm }: LabelPrintFormat) => {
@@ -183,53 +218,52 @@ export function ServerPrint({
   };
   const canConfirm =
     result?.state === 'done' && batch.labels.length === 1 && !batch.printedConfirmedAt;
+  const copies = parseNumber(prompt?.value ?? '');
 
-  return children(
-    action,
+  const choices = (
+    <div className={pickLabel && pickFormat ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
+      {pickLabel ? (
+        <Combobox
+          label={t`Label`}
+          items={batch.labels.map((label) => ({
+            id: label.code,
+            label: label.name ?? printedCode(label.code),
+          }))}
+          selectedKey={code}
+          isDisabled={blocked}
+          showsChoice
+          onSelectionChange={(key) => {
+            if (key !== null) setCode(String(key));
+          }}
+        />
+      ) : null}
+      {pickFormat ? (
+        <Combobox
+          label={t`Roll format`}
+          items={formats.map((item) => ({ id: item.id, label: rollName(item) }))}
+          selectedKey={format.id}
+          isDisabled={blocked}
+          showsChoice
+          onSelectionChange={(key) => {
+            if (key !== null) setFormat(String(key));
+          }}
+        />
+      ) : (
+        <p className="m-0 text-center text-small text-ink-2">{rollName(format)}</p>
+      )}
+    </div>
+  );
+
+  const details = browserMode ? null : (
     <section
       className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 print:hidden sm:py-8"
       aria-label={t`Print server`}
     >
-      <div className={pickLabel && pickFormat ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
-        {pickLabel ? (
-          <Combobox
-            label={t`Label`}
-            items={batch.labels.map((label) => ({
-              id: label.code,
-              label: label.name ?? printedCode(label.code),
-            }))}
-            selectedKey={code}
-            isDisabled={blocked}
-            showsChoice
-            onSelectionChange={(key) => {
-              if (key !== null) setCode(String(key));
-            }}
-          />
-        ) : null}
-        {pickFormat ? (
-          <Combobox
-            label={t`Roll format`}
-            items={formats.map((item) => ({ id: item.id, label: rollName(item) }))}
-            selectedKey={format.id}
-            isDisabled={blocked}
-            showsChoice
-            onSelectionChange={(key) => {
-              if (key !== null) setFormat(String(key));
-            }}
-          />
-        ) : (
-          <p className="m-0 text-center text-small text-ink-2">{rollName(format)}</p>
-        )}
-      </div>
+      {choices}
       {preview.isPending ? <LoadingRows rows={2} /> : null}
       {preview.data ? <Preview png={preview.data.png} /> : null}
-      {preview.isError ? (
-        <Notice tone="danger">
-          {isApiError(preview.error) && preview.error.code === 'validation' && preview.error.hint
-            ? preview.error.hint
-            : errorText(preview.error)}
-        </Notice>
-      ) : null}
+      {preview.isError ? <Notice tone="danger">{describeError(preview.error)}</Notice> : null}
+      {rejected ? <Notice tone="danger">{describeError(send.error)}</Notice> : null}
       <div className="grid justify-items-center gap-2 text-center">
         <div role="status" className="text-small text-ink-2">
           {retry ? (
@@ -258,6 +292,51 @@ export function ServerPrint({
           </Button>
         ) : null}
       </div>
-    </section>,
+    </section>
+  );
+  return (
+    <>
+      {children(action, details)}
+      <Modal
+        isOpen={!!prompt}
+        onOpenChange={(open) => !open && setPrompt(null)}
+        className="print:hidden"
+        overlayClassName="print:hidden"
+      >
+        <Dialog title={<Trans>Print on server</Trans>} showClose={false}>
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!prompt || !validCopies(copies) || !preview.data || blocked) return;
+              setPrompt(null);
+              print(copies);
+              if (browserMode) showServer();
+            }}
+          >
+            {prompt?.choices ? choices : null}
+            <TextField
+              autoFocus
+              label={t`Copies`}
+              errorMessage={`${fmt.num(1)}–${fmt.num(MAX_LABEL_PRINT_COPIES)}`}
+              inputMode="numeric"
+              isRequired
+              isInvalid={!!prompt?.value && !validCopies(copies)}
+              value={prompt?.value ?? ''}
+              onChange={(value) => setPrompt((current) => current && { ...current, value })}
+            />
+            {preview.isError ? <Notice tone="danger">{describeError(preview.error)}</Notice> : null}
+            <DialogFooter>
+              <Button variant="secondary" onPress={() => setPrompt(null)}>
+                <Trans>Cancel</Trans>
+              </Button>
+              <Button type="submit" isDisabled={!validCopies(copies) || !preview.data || blocked}>
+                <Trans>Print</Trans>
+              </Button>
+            </DialogFooter>
+          </form>
+        </Dialog>
+      </Modal>
+    </>
   );
 }

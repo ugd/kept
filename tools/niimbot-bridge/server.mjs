@@ -14,6 +14,8 @@ const pngMagic = Buffer.from('89504e470d0a1a0a', 'hex');
 const MAX_ROLL_WIDTH_MM = 50;
 const MAX_PRINTABLE_WIDTH_MM = 48;
 const DOTS_PER_MM = 8;
+// The B1 task reads the completed copy count as a signed 16-bit number.
+const MAX_COPIES = 0x7fff;
 
 function answer(response, status, data) {
   response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -29,12 +31,15 @@ async function readPrint(request) {
       if (size > maxBytes) return null;
       chunks.push(chunk);
     }
-    const { id, format, png } = JSON.parse(Buffer.concat(chunks).toString());
+    const { id, format, png, copies = 1 } = JSON.parse(Buffer.concat(chunks).toString());
     const { widthMm, heightMm, dotsPerMm, printableWidthMm = widthMm } = format ?? {};
     if (
       typeof id !== 'string' ||
       !jobId.test(id) ||
       typeof png !== 'string' ||
+      !Number.isInteger(copies) ||
+      copies < 1 ||
+      copies > MAX_COPIES ||
       dotsPerMm !== DOTS_PER_MM ||
       !Number.isFinite(widthMm) ||
       widthMm < 8 ||
@@ -58,7 +63,18 @@ async function readPrint(request) {
       height !== Math.round(heightMm * DOTS_PER_MM)
     )
       return null;
-    return { id, image, fingerprint: hash(image).toString('hex') };
+    // Keep the original fingerprint for a one-copy job already recorded by an older bridge.
+    const fingerprint = (
+      copies === 1
+        ? hash(image)
+        : createHash('sha256')
+            .update('kept-print-copies')
+            .update(String(copies))
+            .update('\0')
+            .update(image)
+            .digest()
+    ).toString('hex');
+    return { id, image, fingerprint, copies };
   } catch {
     return null;
   }
@@ -79,10 +95,10 @@ export function makeServer({ token, database, printLabel }) {
   const insert = db.prepare("INSERT INTO jobs VALUES (?, ?, 'queued')");
   const update = db.prepare('UPDATE jobs SET state = ? WHERE id = ?');
 
-  async function run({ id, image }) {
+  async function run({ id, image, copies }) {
     update.run('printing', id);
     try {
-      await printLabel(image);
+      await printLabel(image, copies);
       update.run('done', id);
     } catch (error) {
       update.run(error.uncertain ? 'uncertain' : 'failed', id);
@@ -96,7 +112,7 @@ export function makeServer({ token, database, printLabel }) {
       return;
     }
     if (request.method === 'GET' && request.url === '/api/kept/v1/health') {
-      answer(response, 200, { ok: true });
+      answer(response, 200, { ok: true, maxCopies: MAX_COPIES });
       return;
     }
     if (request.method === 'GET' && request.url?.startsWith(`${path}/`)) {
@@ -107,7 +123,10 @@ export function makeServer({ token, database, printLabel }) {
     }
     if (request.method === 'POST' && request.url === path) {
       const job = await readPrint(request);
-      if (!job) return answer(response, 422, { error: 'Invalid B21S-C2B raster or roll format' });
+      if (!job)
+        return answer(response, 422, {
+          error: 'Invalid B21S-C2B raster, roll format or copy count',
+        });
       const existing = find.get(job.id);
       if (existing) {
         return existing.fingerprint === job.fingerprint

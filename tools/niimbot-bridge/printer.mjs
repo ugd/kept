@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 
 export function makePrinter({ transport, address }) {
-  return async function printLabel(png) {
+  return async function printLabel(png, copies) {
     const {
       default: { initClient, printImages },
     } = await import('@mmote/niimblue-node/dist/utils.js');
@@ -28,7 +28,7 @@ export function makePrinter({ transport, address }) {
       const encoded = await ImageEncoder.encodeImage(sharp(png), PageColorType.SingleColor, 'top');
       try {
         await printImages(client, 'B1', [{ encoded }], {
-          quantity: 1,
+          quantity: copies,
           density: 3,
           labelType: LabelType.WithGaps,
         });

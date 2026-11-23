@@ -183,7 +183,7 @@ export function BatchBuilder({
       await navigate({
         to: '/labels/$batchId',
         params: { batchId: batch.id },
-        search: destination === 'browser' ? { print: 1, mode: 'browser' } : {},
+        search: destination === 'browser' ? { print: 1, mode: 'browser' } : { print: 'server' },
       });
     },
   });

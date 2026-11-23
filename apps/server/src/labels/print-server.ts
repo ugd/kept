@@ -63,7 +63,10 @@ export const PrintConnectionView = z.object({
     .extend({ source: z.enum(['settings', 'file']) })
     .nullable(),
 });
-export const PrintServerHealth = z.object({ ok: z.literal(true) });
+export const PrintServerHealth = z.object({
+  ok: z.literal(true),
+  maxCopies: z.number().int().positive().optional(),
+});
 
 const publicFetch = guardedFetch({ allowPrivate: false });
 const privateFetch = guardedFetch({ allowPrivate: true });
@@ -141,8 +144,24 @@ export function printServer(
 
   return {
     check: () => call('health', PrintServerHealth),
-    submit: (id: string, format: PrintFormat, png: Buffer) =>
-      call('jobs', PrintServerState, { id, format, png: png.toString('base64') }),
+    submit: async (id: string, format: PrintFormat, png: Buffer, copies = 1) => {
+      if (copies > 1) {
+        const { maxCopies = 1 } = await call('health', PrintServerHealth);
+        if (copies > maxCopies) {
+          throw invalid(
+            maxCopies === 1
+              ? 'Update the print server to print more than one copy per job.'
+              : `The print server supports up to ${maxCopies} copies per job.`,
+          );
+        }
+      }
+      return call('jobs', PrintServerState, {
+        id,
+        format,
+        png: png.toString('base64'),
+        ...(copies > 1 ? { copies } : {}),
+      });
+    },
     status: (id: string) => call(`jobs/${id}`, PrintServerState),
   };
 }

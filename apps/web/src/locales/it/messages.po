@@ -29444,3 +29444,7 @@ msgstr "Usa l’indirizzo del bridge in esecuzione vicino alla stampante. Il ser
 #: src/routes/_print/labels.$batchId.tsx
 msgid "Browser printing"
 msgstr "Stampa dal browser"
+
+#: src/components/labels/server-print.tsx
+msgid "Copies"
+msgstr "Copie"

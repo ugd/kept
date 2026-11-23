@@ -29444,3 +29444,7 @@ msgstr "Usa la dirección del puente que se ejecuta cerca de la impresora. El se
 #: src/routes/_print/labels.$batchId.tsx
 msgid "Browser printing"
 msgstr "Imprimir desde el navegador"
+
+#: src/components/labels/server-print.tsx
+msgid "Copies"
+msgstr "Copias"

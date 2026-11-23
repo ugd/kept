@@ -1,4 +1,4 @@
-import { SHORT_CODE } from '@kept/shared';
+import { MAX_LABEL_PRINT_COPIES, SHORT_CODE } from '@kept/shared';
 import type { FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { z } from 'zod';
@@ -295,7 +295,10 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
       config: printModule,
       schema: {
         params: z.object({ id: Id }),
-        body: PrintChoice.extend({ requestId: Id }),
+        body: PrintChoice.extend({
+          requestId: Id,
+          copies: z.number().int().min(1).max(MAX_LABEL_PRINT_COPIES).default(1),
+        }),
         response: { 202: PrintServerState },
       },
     },
@@ -306,13 +309,19 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
         const { label, format } = printableLabel(batch, formats, req.body);
         const jobId = printJobId(scope.userId, batch.id, req.body.requestId.toLowerCase());
         // Replays after an uncertain network response use the same physical job identifier.
-        const body = await printer.submit(jobId, format, await renderPrintLabel(label, format));
+        const { copies } = req.body;
+        const body = await printer.submit(
+          jobId,
+          format,
+          await renderPrintLabel(label, format),
+          copies,
+        );
         await audited(tx, {
           locationId: batch.locationId,
           actor: actorOf(scope),
           action: 'labels.print_server',
           entity: { type: 'label_batch', id: batch.id },
-          after: { format: format.id },
+          after: { format: format.id, copies },
           requestId: req.id,
         });
         return { status: 202, body };

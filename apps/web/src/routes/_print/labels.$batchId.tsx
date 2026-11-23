@@ -39,12 +39,13 @@ import { toast } from '@/components/ui/toast';
 import { canShareType } from '@/lib/files';
 import { useFormat } from '@/lib/format';
 
-type PrintSearch = { print?: 1; mode?: 'browser'; stock?: string; start?: number };
+type PrintSearch = { print?: 1 | 'server'; mode?: 'browser'; stock?: string; start?: number };
 
 export const Route = createFileRoute('/_print/labels/$batchId')({
   validateSearch: (s: Record<string, unknown>): PrintSearch => {
     const out: PrintSearch = {};
     if (s.print === 1 || s.print === '1') out.print = 1;
+    if (s.print === 'server') out.print = 'server';
     if (s.mode === 'browser') out.mode = 'browser';
     if (typeof s.stock === 'string' && LABEL_STOCKS.some((x) => x.key === s.stock))
       out.stock = s.stock;
@@ -62,6 +63,16 @@ function PrintLabelsPage() {
   const batch = useLabelBatch(batchId);
   const data = batch.data;
   const server = usePrintServer(data?.locationId);
+  const openCopies = search.print === 'server' && !!server.data?.formats.length;
+  useEffect(() => {
+    if (!openCopies) return;
+    void navigate({
+      to: '/labels/$batchId',
+      params: { batchId },
+      search: (prev) => ({ ...prev, print: undefined }),
+      replace: true,
+    });
+  }, [openCopies, navigate, batchId]);
 
   if (batch.isPending) return <LoadingRows />;
   if (batch.isError || !data)
@@ -95,6 +106,7 @@ function PrintLabelsPage() {
       stock={stock}
       formats={formats}
       browserMode={browserRequested}
+      initiallyOpen={openCopies}
       showServer={() =>
         void navigate({
           to: '/labels/$batchId',
@@ -184,7 +196,7 @@ function BrowserPrint({
 
   // From the builder: open the dialog once, when the QR and the faces are ready.
   useEffect(() => {
-    if (!search.print || !encode || !ready || autoPrinted.current) return;
+    if (search.print !== 1 || !encode || !ready || autoPrinted.current) return;
     autoPrinted.current = true;
     void navigate({
       to: '/labels/$batchId',
