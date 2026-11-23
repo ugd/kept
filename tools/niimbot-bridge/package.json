@@ -1,0 +1,18 @@
+{
+  "name": "kept-niimbot-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@mmote/niimblue-node": "1.4.1",
+    "@mmote/niimbluelib": "0.47.0-node",
+    "sharp": "0.35.5"
+  }
+}
