@@ -20,7 +20,7 @@ import { plural } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLabelBatch } from '@/api/capture/queries';
 import { ChevronStartIcon, PrinterIcon, ShareIcon } from '@/components/icons';
 import { useLabelMeasure } from '@/components/labels/fit';
@@ -28,6 +28,7 @@ import { perPage } from '@/components/labels/layout';
 import { labelPngs, shareOrDownload } from '@/components/labels/png';
 import { NotConfirmedBar, PrintedOkDialog } from '@/components/labels/printed-ok';
 import { useQrEncoder } from '@/components/labels/qr';
+import { ServerPrint, usePrintServer } from '@/components/labels/server-print';
 import { LabelSheets } from '@/components/labels/sheet';
 import { useStockText } from '@/components/labels/stock-picker';
 import { ErrorState, LoadingRows, Notice, useErrorText } from '@/components/page';
@@ -64,10 +65,12 @@ function PrintLabelsPage() {
   const { measure, ready } = useLabelMeasure();
   const [asking, setAsking] = useState(false);
   const [printedHere, setPrintedHere] = useState(false);
+  const markPrintedHere = useCallback(() => setPrintedHere(true), []);
   const autoPrinted = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   const data = batch.data;
+  const server = usePrintServer(data?.locationId);
   const stockKey =
     search.stock ??
     (data && LABEL_STOCKS.some((s) => s.key === data.stock) ? data.stock : 'a4_24_70x37');
@@ -201,6 +204,16 @@ function PrintLabelsPage() {
           )}
         </p>
       </header>
+      {server.data?.formats.length ? (
+        <div className="mx-auto w-full max-w-2xl p-3 print:hidden md:p-6">
+          <ServerPrint
+            key={data.id}
+            batch={data}
+            formats={server.data.formats}
+            onPrinted={markPrintedHere}
+          />
+        </div>
+      ) : null}
       <LabelSheets
         stock={stock}
         labels={data.labels}

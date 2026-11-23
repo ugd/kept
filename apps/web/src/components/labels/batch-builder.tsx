@@ -48,6 +48,7 @@ import { labelsTooLong, useLabelMeasure } from './fit';
 import { LabelCell } from './label-cell';
 import { perPage } from './layout';
 import { useQrEncoder } from './qr';
+import { usePrintServer } from './server-print';
 import { blankSample, StartCellPicker } from './start-cell';
 import { rememberedStock, StockPicker, useStockText } from './stock-picker';
 
@@ -164,13 +165,14 @@ export function BatchBuilder({
   const count = blank ? blankCount : labels.length;
   const pending = preview.data?.excluded.pending ?? 0;
 
+  const server = usePrintServer(source.locationId);
   const create = useMutation({
-    mutationFn: () => captureApi.createLabelBatch(body),
+    mutationFn: (_destination: 'browser' | 'server') => captureApi.createLabelBatch(body),
     // The list changed under the preview (printed, trashed or pending since): show it as it is.
     onError: (e) => {
       if (nothingToLabel(e)) void preview.refetch();
     },
-    onSuccess: async ({ batch }) => {
+    onSuccess: async ({ batch }, destination) => {
       qc.setQueryData(captureKeys.labels.batch(batch.id), batch);
       // Not the preview: it would post its dry run again for a builder that is closing.
       void qc.invalidateQueries({
@@ -180,7 +182,7 @@ export function BatchBuilder({
       await navigate({
         to: '/labels/$batchId',
         params: { batchId: batch.id },
-        search: { print: 1 },
+        search: destination === 'browser' ? { print: 1 } : {},
       });
     },
   });
@@ -286,13 +288,22 @@ export function BatchBuilder({
         <div className="grid gap-2">
           <div className="flex flex-wrap gap-2">
             <Button
-              onPress={() => create.mutate()}
+              onPress={() => create.mutate('browser')}
               isPending={create.isPending}
               isDisabled={count === 0 || preview.isError || preview.isPending}
             >
               <PrinterIcon className="size-5" />
               {plural(count, { one: 'Print # label', other: 'Print # labels' })}
             </Button>
+            {server.data?.formats.length ? (
+              <Button
+                variant="secondary"
+                onPress={() => create.mutate('server')}
+                isDisabled={count === 0 || preview.isError || preview.isPending || create.isPending}
+              >
+                <Trans>Print on server</Trans>
+              </Button>
+            ) : null}
             <Link
               to="/labels"
               className="inline-flex min-h-11 items-center rounded-[10px] px-3 font-semibold text-ink underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-info"

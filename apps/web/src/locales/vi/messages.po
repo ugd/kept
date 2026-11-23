@@ -21368,3 +21368,47 @@ msgstr "Chủ sở hữu hoặc quản trị viên bật nó trong mục Theo d�
 #: src/components/counts/counts-list.tsx
 msgid "Counts are off here: this lists the box checks."
 msgstr "Kiểm kê đang tắt ở đây: danh sách này hiện các lần kiểm tra hộp."
+
+#: src/components/labels/server-print.tsx
+msgid "Check the physical label before printing again."
+msgstr "Kiểm tra nhãn đã in trước khi in lại."
+
+#: src/components/labels/server-print.tsx
+msgid "Could not confirm the print request. Retrying the same request will not print it twice."
+msgstr "Không xác nhận được yêu cầu in. Gửi lại cùng yêu cầu sẽ không in nhãn hai lần."
+
+#: src/components/labels/server-print.tsx
+msgid "Print on server"
+msgstr "In qua máy chủ"
+
+#: src/components/labels/server-print.tsx
+msgid "Print server"
+msgstr "Máy chủ in"
+
+#: src/components/labels/server-print.tsx
+msgid "Retry print request"
+msgstr "Gửi lại yêu cầu in"
+
+#: src/components/labels/server-print.tsx
+msgid "Roll format"
+msgstr "Khổ cuộn nhãn"
+
+#: src/components/history/labels.tsx
+msgid "Sent a label to the print server"
+msgstr "Đã gửi một nhãn đến máy chủ in"
+
+#: src/components/labels/server-print.tsx
+msgid "The print server could not print the label."
+msgstr "Máy chủ in không in được nhãn."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished this label."
+msgstr "Máy in đã in xong nhãn này."
+
+#: src/components/labels/server-print.tsx
+msgid "Waiting for the print server…"
+msgstr "Đang chờ máy chủ in…"
+
+#: src/components/labels/server-print.tsx
+msgid "{width} × {height} mm"
+msgstr "{width} × {height} mm"

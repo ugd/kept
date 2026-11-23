@@ -1,18 +1,29 @@
+import { SHORT_CODE } from '@kept/shared';
 import type { FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { z } from 'zod';
+import { actorOf } from '../audit/actor.js';
+import { audited } from '../audit/audited.js';
 import type { Pools } from '../db/pools.js';
 import { type Scope, type Tx, withScope } from '../db/scope.js';
 import type { KeptApp } from '../http/app.js';
 import { paginate, paginationQuery } from '../http/conventions.js';
-import { AppError } from '../http/errors.js';
+import { AppError, notFound } from '../http/errors.js';
 import { locationModuleSet } from '../http/modules.js';
 import type { InventoryDeps } from '../http/routes.js';
 import { scopedRead, scopedWrite } from '../http/write.js';
 import { requireMembership } from '../locations/access.js';
-import type { Ctx } from '../things/service.js';
+import { type Ctx, requireRole } from '../things/service.js';
 import { ClaimTarget, claimableCode, claimLabel, labelClaimed } from './claim.js';
 import { formerHostHook } from './former-hosts.js';
+import {
+  FormatId,
+  loadPrintServer,
+  PrintFormat,
+  PrintServerState,
+  printJobId,
+  renderPrintLabel,
+} from './print-server.js';
 import {
   CreateBatchBody,
   CreateBatchResultSchema,
@@ -53,6 +64,7 @@ import {
 
 const Id = z.uuid();
 const CodeParam = z.object({ code: z.string().min(1).max(32) });
+const PrintChoice = z.strictObject({ code: z.string().regex(SHORT_CODE), formatId: FormatId });
 
 const ClaimResultSchema = z.object({
   outcome: z.literal('claimed'),
@@ -107,6 +119,7 @@ async function requireLabelsOn(tx: Tx, client: pg.ClientBase, locationId: string
 export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<void> {
   const { pools } = deps;
   const publicUrl = deps.env.KEPT_PUBLIC_URL;
+  const printer = await loadPrintServer(deps.env.KEPT_LABEL_PRINT_CONFIG_FILE);
   const ctxOf = (req: FastifyRequest, tx: Tx, client: pg.PoolClient, scope: Scope): Ctx => ({
     tx,
     client,
@@ -214,6 +227,117 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
         const placeId = locationId ? (req.query.placeId?.toLowerCase() ?? null) : null;
         return labelSummary(client, locationId, placeId);
       }),
+  );
+
+  async function printableBatch(client: pg.ClientBase, id: string) {
+    const batch = await getBatch(client, publicUrl, id.toLowerCase());
+    if (!printer?.formatsFor(batch.locationId).length) throw notFound();
+    await requireRole(client, batch.locationId, 'labels.use');
+    return { batch, printer };
+  }
+
+  async function printableLabel(
+    client: pg.ClientBase,
+    id: string,
+    choice: z.infer<typeof PrintChoice>,
+  ) {
+    const { batch, printer } = await printableBatch(client, id);
+    const label = batch.labels.find((item) => item.code === choice.code);
+    const format = printer.formatsFor(batch.locationId).find((item) => item.id === choice.formatId);
+    if (!label || !format) throw notFound();
+    return { batch, printer, label, format };
+  }
+
+  app.get(
+    '/api/v1/labels/print-server',
+    {
+      schema: {
+        querystring: z.object({ locationId: Id }),
+        response: { 200: z.object({ formats: z.array(PrintFormat) }) },
+      },
+    },
+    (req) =>
+      scopedRead(pools, req, async (tx, client) => {
+        const id = req.query.locationId.toLowerCase();
+        await requireLabelsOn(tx, client, id);
+        await requireRole(client, id, 'labels.use');
+        return { formats: printer?.formatsFor(id) ?? [] };
+      }),
+  );
+
+  const printModule = { module: 'labels' as const, moduleLocation: batchLocation(pools) };
+  app.get(
+    '/api/v1/labels/batches/:id/print-server/preview',
+    {
+      config: printModule,
+      schema: {
+        params: z.object({ id: Id }),
+        querystring: PrintChoice,
+        response: { 200: z.object({ png: z.string() }) },
+      },
+    },
+    async (req, reply) => {
+      const { label, format } = await scopedRead(pools, req, (_tx, client) =>
+        printableLabel(client, req.params.id, req.query),
+      );
+      reply.header('cache-control', 'no-store');
+      return { png: (await renderPrintLabel(label, format)).toString('base64') };
+    },
+  );
+
+  app.post(
+    '/api/v1/labels/batches/:id/print-server/jobs',
+    {
+      config: printModule,
+      schema: {
+        params: z.object({ id: Id }),
+        body: PrintChoice.extend({ requestId: Id }),
+        response: { 202: PrintServerState },
+      },
+    },
+    (req, reply) =>
+      scopedWrite(pools, req, reply, async (tx, client, scope) => {
+        const { batch, printer, label, format } = await printableLabel(
+          client,
+          req.params.id,
+          req.body,
+        );
+        const jobId = printJobId(scope.userId, batch.id, req.body.requestId.toLowerCase());
+        // Replays after an uncertain network response use the same physical job identifier.
+        const body = await printer.submit(jobId, format, await renderPrintLabel(label, format));
+        await audited(tx, {
+          locationId: batch.locationId,
+          actor: actorOf(scope),
+          action: 'labels.print_server',
+          entity: { type: 'label_batch', id: batch.id },
+          after: { format: format.id },
+          requestId: req.id,
+        });
+        return { status: 202, body };
+      }),
+  );
+
+  app.get(
+    '/api/v1/labels/batches/:id/print-server/jobs/:requestId',
+    {
+      config: printModule,
+      schema: {
+        params: z.object({ id: Id, requestId: Id }),
+        response: { 200: PrintServerState },
+      },
+    },
+    async (req, reply) => {
+      const { batch, printer, userId } = await scopedRead(
+        pools,
+        req,
+        async (_tx, client, scope) => ({
+          ...(await printableBatch(client, req.params.id)),
+          userId: scope.userId,
+        }),
+      );
+      reply.header('cache-control', 'no-store');
+      return printer.status(printJobId(userId, batch.id, req.params.requestId.toLowerCase()));
+    },
   );
 
   app.post(

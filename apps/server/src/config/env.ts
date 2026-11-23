@@ -143,6 +143,11 @@ const schema = z.object({
       'earlier `KEPT_SECRET_KEY` versions, still needed to open values and backups sealed before a rotation: comma-separated `version:key` pairs; never logged',
     ),
   KEPT_PUBLIC_URL: httpUrl().describe('required; source of truth for links and QR codes'),
+  KEPT_LABEL_PRINT_CONFIG_FILE: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('optional path to a mounted label print server configuration; keep its key private'),
   KEPT_ROLE: z.enum(KEPT_ROLES).default('all').describe('`all`, `web`, `worker`'),
   KEPT_STORAGE: z.enum(KEPT_STORAGES).default('local').describe('`local`, `s3` (+ `KEPT_S3_*`)'),
   KEPT_SMTP_URL: z

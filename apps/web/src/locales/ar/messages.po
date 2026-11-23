@@ -29320,3 +29320,47 @@ msgstr "يفعّله المالك أو المشرف من «ما الذي تتا�
 #: src/components/counts/counts-list.tsx
 msgid "Counts are off here: this lists the box checks."
 msgstr "العدّ متوقف هنا: تعرض هذه القائمة فحوص الصناديق."
+
+#: src/components/labels/server-print.tsx
+msgid "Check the physical label before printing again."
+msgstr "تحقّق من الملصق المطبوع قبل إعادة الطباعة."
+
+#: src/components/labels/server-print.tsx
+msgid "Could not confirm the print request. Retrying the same request will not print it twice."
+msgstr "تعذّر تأكيد طلب الطباعة. إعادة إرسال الطلب نفسه لن تطبع الملصق مرتين."
+
+#: src/components/labels/server-print.tsx
+msgid "Print on server"
+msgstr "الطباعة عبر الخادم"
+
+#: src/components/labels/server-print.tsx
+msgid "Print server"
+msgstr "خادم الطباعة"
+
+#: src/components/labels/server-print.tsx
+msgid "Retry print request"
+msgstr "إعادة إرسال طلب الطباعة"
+
+#: src/components/labels/server-print.tsx
+msgid "Roll format"
+msgstr "مقاس البكرة"
+
+#: src/components/history/labels.tsx
+msgid "Sent a label to the print server"
+msgstr "أرسل ملصقًا إلى خادم الطباعة"
+
+#: src/components/labels/server-print.tsx
+msgid "The print server could not print the label."
+msgstr "تعذّر على خادم الطباعة طباعة الملصق."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished this label."
+msgstr "انتهت الطابعة من طباعة هذا الملصق."
+
+#: src/components/labels/server-print.tsx
+msgid "Waiting for the print server…"
+msgstr "بانتظار خادم الطباعة…"
+
+#: src/components/labels/server-print.tsx
+msgid "{width} × {height} mm"
+msgstr "{width} × {height} مم"

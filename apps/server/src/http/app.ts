@@ -76,6 +76,7 @@ export type AppEnv = Pick<Env, 'KEPT_PUBLIC_URL'> &
     Pick<
       Env,
       | 'KEPT_METRICS_TOKEN'
+      | 'KEPT_LABEL_PRINT_CONFIG_FILE'
       | 'KEPT_SOURCE_URL'
       | 'KEPT_TRUSTED_PROXIES'
       | 'KEPT_HSTS'

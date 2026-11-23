@@ -1,5 +1,10 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import { newId, randomShortCode } from '@kept/shared';
 import type { LightMyRequestResponse } from 'fastify';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { TestApp } from '../../test/app.js';
 import { type TestDb, testDb } from '../../test/db.js';
@@ -830,4 +835,96 @@ describe('leak: the label routes answer another household exactly as nothing', (
     const listed = ok(await call(t, '/api/v1/labels/batches?limit=200', { as: ibrahim }));
     expect((listed.items as Json[]).some((b) => b.id === id)).toBe(false);
   });
+});
+
+// catalogue: POST /api/v1/labels/batches/:id/print-server/jobs
+it('previews and sends the selected roll raster once, with an audit event and no key disclosure', async () => {
+  const directory = await mkdtemp(joinPath(tmpdir(), 'kept-label-print-test-'));
+  const jobs: { id: string; format: { id: string }; png: string }[] = [];
+  const bridge = createServer(async (request, response) => {
+    if (request.headers.authorization !== 'Bearer fixture-print-key') {
+      response.writeHead(401).end();
+      return;
+    }
+    response.setHeader('Content-Type', 'application/json');
+    if (request.method === 'GET') {
+      const known = jobs.some(({ id }) => request.url === `/api/kept/v1/jobs/${id}`);
+      response.writeHead(known ? 200 : 404).end(JSON.stringify({ state: 'done' }));
+      return;
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    jobs.push(JSON.parse(Buffer.concat(chunks).toString()));
+    response.writeHead(202).end(JSON.stringify({ state: 'queued', ignore: 'fixture-print-key' }));
+  });
+  let configured: TestApp | undefined;
+  try {
+    await new Promise<void>((resolve) => bridge.listen(0, '127.0.0.1', resolve));
+    const address = bridge.address();
+    if (typeof address !== 'object' || address === null) throw new Error('No test bridge listener');
+    const config = joinPath(directory, 'bridge.json');
+    await writeFile(
+      config,
+      JSON.stringify({
+        url: `http://127.0.0.1:${address.port}`,
+        token: 'fixture-print-key',
+        allowPrivate: true,
+        locations: [home.id],
+        formats: [
+          { id: '12x30', widthMm: 12, heightMm: 30, dotsPerMm: 8 },
+          { id: '40x30', widthMm: 40, heightMm: 30, dotsPerMm: 8 },
+        ],
+      }),
+    );
+    configured = await peopleApp(db, { labelPrintConfigFile: config });
+    const creation = await batch(ibrahim, { locationId: home.id, kind: 'blank', blankCount: 1 });
+    expect(creation.statusCode).toBe(201);
+    const labels = creation.json<{ batch: Batch }>().batch;
+    const code = labels.labels[0]?.code;
+    const capabilities = await call(
+      configured,
+      `/api/v1/labels/print-server?locationId=${home.id}`,
+      { as: ibrahim },
+    );
+    expect(capabilities.json().formats.map((item: { id: string }) => item.id)).toEqual([
+      '12x30',
+      '40x30',
+    ]);
+    const base = `/api/v1/labels/batches/${labels.id}/print-server`;
+    const preview = await call(configured, `${base}/preview?code=${code}&formatId=40x30`, {
+      as: ibrahim,
+    });
+    expect(preview.statusCode).toBe(200);
+    const png = preview.json<{ png: string }>().png;
+    expect(await sharp(Buffer.from(png, 'base64')).metadata()).toMatchObject({
+      width: 320,
+      height: 240,
+    });
+    const requestId = newId();
+    const body = { code, formatId: '40x30', requestId };
+    const headers = { 'idempotency-key': requestId };
+    expect((await call(configured, `${base}/jobs`, { as: talia, body })).statusCode).toBe(403);
+    expect((await call(configured, `${base}/jobs`, { as: bruce, body })).statusCode).toBe(404);
+    const submit = await call(configured, `${base}/jobs`, { as: ibrahim, body, headers });
+    expect(submit.statusCode).toBe(202);
+    expect(submit.json()).toEqual({ state: 'queued' });
+    const retry = await call(configured, `${base}/jobs`, { as: ibrahim, body, headers });
+    expect(retry.headers['idempotent-replayed']).toBe('true');
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toMatchObject({ format: { id: '40x30' }, png });
+    expect((await call(configured, `${base}/jobs/${requestId}`, { as: ibrahim })).json()).toEqual({
+      state: 'done',
+    });
+    expect((await call(configured, `${base}/jobs/${requestId}`, { as: louis })).statusCode).toBe(
+      404,
+    );
+    const audit = await auditActions(home.id, 'labels.print_server');
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ entity_id: labels.id, actor_id: ibrahim.userId });
+    expect(JSON.stringify(audit)).not.toContain('fixture-print-key');
+  } finally {
+    await configured?.app.close();
+    bridge.close();
+    await rm(directory, { force: true, recursive: true });
+  }
 });

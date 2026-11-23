@@ -29,6 +29,7 @@ The Compose file passes the common ones through from `.env`; the rest go in a
 | `KEPT_SECRET_KEY_VERSION` |  | the version of `KEPT_SECRET_KEY`: `1` when unset; `kept admin rotate-key` says what to set (§7.3) |
 | `KEPT_SECRET_KEYS_RETIRED` |  | earlier `KEPT_SECRET_KEY` versions, still needed to open values and backups sealed before a rotation: comma-separated `version:key` pairs; never logged |
 | `KEPT_PUBLIC_URL` |  | required; source of truth for links and QR codes |
+| `KEPT_LABEL_PRINT_CONFIG_FILE` |  | optional path to a mounted label print server configuration; keep its key private |
 | `KEPT_ROLE` | `all` | `all`, `web`, `worker` |
 | `KEPT_STORAGE` | `local` | `local`, `s3` (+ `KEPT_S3_*`) |
 | `KEPT_SMTP_URL` |  | optional; `smtp://` or `smtps://`, with credentials if needed; unset, mail is only logged as due |

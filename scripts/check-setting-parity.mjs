@@ -49,6 +49,7 @@ export const NOT_IN_ENV_EXAMPLE = {
   KEPT_TLS_KEY_FILE: 'documented on the HTTPS page',
   KEPT_SECRET_KEY_VERSION: 'a key-rotation runbook step',
   KEPT_SECRET_KEYS_RETIRED: 'a key-rotation runbook step',
+  KEPT_LABEL_PRINT_CONFIG_FILE: 'a mounted configuration file set in a Compose override',
   // Not in the example as of 1.14.4; decide when someone asks.
   KEPT_APPRISE_URL: 'not in the example as of 1.14.4',
   KEPT_BACKUP_KEEP: 'not in the example as of 1.14.4',
@@ -63,6 +64,7 @@ export const NOT_PASSED_BY_COMPOSE = {
 
 /** Settings the Home Assistant app doesn't offer or set, each with why. */
 export const NOT_IN_HA_APP = {
+  KEPT_LABEL_PRINT_CONFIG_FILE: 'the print server configuration file is for standalone installs',
   // Not offered on purpose (homeassistant/kept/config.yaml): S3 file storage, and Kept's own
   // backups, since Home Assistant's backups are the backup here.
   ...Object.fromEntries(

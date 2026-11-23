@@ -29320,3 +29320,47 @@ msgstr "Ein Eigentümer oder Admin schaltet sie unter „Was erfasst wird“ ein
 #: src/components/counts/counts-list.tsx
 msgid "Counts are off here: this lists the box checks."
 msgstr "Zählungen sind hier aus: Diese Liste zeigt die Kistenchecks."
+
+#: src/components/labels/server-print.tsx
+msgid "Check the physical label before printing again."
+msgstr "Prüfe das gedruckte Etikett, bevor du erneut druckst."
+
+#: src/components/labels/server-print.tsx
+msgid "Could not confirm the print request. Retrying the same request will not print it twice."
+msgstr "Der Druckauftrag konnte nicht bestätigt werden. Das Wiederholen desselben Auftrags druckt das Etikett nicht doppelt."
+
+#: src/components/labels/server-print.tsx
+msgid "Print on server"
+msgstr "Über Server drucken"
+
+#: src/components/labels/server-print.tsx
+msgid "Print server"
+msgstr "Druckserver"
+
+#: src/components/labels/server-print.tsx
+msgid "Retry print request"
+msgstr "Druckauftrag erneut senden"
+
+#: src/components/labels/server-print.tsx
+msgid "Roll format"
+msgstr "Rollenformat"
+
+#: src/components/history/labels.tsx
+msgid "Sent a label to the print server"
+msgstr "Ein Etikett an den Druckserver gesendet"
+
+#: src/components/labels/server-print.tsx
+msgid "The print server could not print the label."
+msgstr "Der Druckserver konnte das Etikett nicht drucken."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished this label."
+msgstr "Der Drucker hat dieses Etikett fertig gedruckt."
+
+#: src/components/labels/server-print.tsx
+msgid "Waiting for the print server…"
+msgstr "Auf den Druckserver warten…"
+
+#: src/components/labels/server-print.tsx
+msgid "{width} × {height} mm"
+msgstr "{width} × {height} mm"

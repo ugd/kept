@@ -53,6 +53,11 @@ export const capturePaths = {
   labelBatchPrinted: (id: string) => `${V1}/labels/batches/${seg(id)}/printed`,
   labelBatchDismiss: (id: string) => `${V1}/labels/batches/${seg(id)}/dismiss`,
   labelSummary: `${V1}/labels/summary`,
+  labelPrintServer: `${V1}/labels/print-server`,
+  labelServerPreview: (id: string) => `${V1}/labels/batches/${seg(id)}/print-server/preview`,
+  labelServerJobs: (id: string) => `${V1}/labels/batches/${seg(id)}/print-server/jobs`,
+  labelServerJob: (id: string, requestId: string) =>
+    `${V1}/labels/batches/${seg(id)}/print-server/jobs/${seg(requestId)}`,
   codeClaim: (code: string) => `${V1}/codes/${seg(code)}/claim`,
 
   // ----- scan, barcodes, box checks -----------
@@ -138,6 +143,10 @@ export const CAPTURE_METHODS: Record<keyof typeof capturePaths, readonly Method[
   labelBatchPrinted: ['POST'],
   labelBatchDismiss: ['POST'],
   labelSummary: ['GET'],
+  labelPrintServer: ['GET'],
+  labelServerPreview: ['GET'],
+  labelServerJobs: ['POST'],
+  labelServerJob: ['GET'],
   codeClaim: ['POST'],
   scanResolve: ['POST'],
   scanResolveBatch: ['POST'],

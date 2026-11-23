@@ -69,6 +69,8 @@ export type TestAppOptions = {
   httpSignInDays?: number;
   /** KEPT_EXTRA_ADDRESSES, as loadEnv leaves it; default none. */
   extraAddresses?: readonly string[];
+  /** A private test fixture for the optional label print server. */
+  labelPrintConfigFile?: string;
 };
 
 export async function testApp(db: TestDb, opts: TestAppOptions = {}): Promise<TestApp> {
@@ -96,6 +98,9 @@ export async function testApp(db: TestDb, opts: TestAppOptions = {}): Promise<Te
       ...(opts.appMode ? { KEPT_HA: true } : {}),
       ...(opts.haTrustGroups ? { KEPT_HA_TRUST_GROUPS: true } : {}),
       ...(opts.signupOpenEnv !== undefined ? { KEPT_SIGNUP_OPEN: opts.signupOpenEnv } : {}),
+      ...(opts.labelPrintConfigFile
+        ? { KEPT_LABEL_PRINT_CONFIG_FILE: opts.labelPrintConfigFile }
+        : {}),
     },
     pools: db.pools as Pools,
     auth,

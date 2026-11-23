@@ -8,9 +8,11 @@
  */
 import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { capturePaths } from '@/api/capture/paths';
 import type { LabelBatch } from '@/api/capture/types';
 import { INV_IDS } from '@/api/inventory/mock/fixtures';
 import { IDS, ownerScenario } from '@/api/mock/fixtures';
+import { reply } from '@/api/mock/kit';
 import { FSI, PDI } from '@/lib/bidi';
 import { expectLogicalOnly } from '@/test/render';
 import { findHeading, pathOf, renderApp } from '../app';
@@ -71,6 +73,46 @@ describe('the labels screen', () => {
 });
 
 describe('the batch builder', () => {
+  it('chooses a server roll and submits a label without opening the browser print dialog', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const { user, mock, router } = await renderApp(
+      `/labels?loc=${IDS.home}&things=${T.hdmiCable}`,
+      {
+        setup(mock) {
+          mock.on('GET', capturePaths.labelPrintServer, () =>
+            reply(200, {
+              formats: [
+                { id: '12x30', widthMm: 12, heightMm: 30 },
+                { id: '40x30', widthMm: 40, heightMm: 30 },
+              ],
+            }),
+          );
+          mock.on('GET', capturePaths.labelServerPreview(':id'), () =>
+            reply(200, { png: 'aGVsbG8=' }),
+          );
+          mock.on('POST', capturePaths.labelServerJobs(':id'), () => reply(202, { state: 'done' }));
+        },
+      },
+    );
+    await user.click(await screen.findByRole('button', { name: 'Print on server' }));
+    const section = await screen.findByRole('region', { name: 'Print server' });
+    const picker = within(section).getByRole('combobox', { name: 'Roll format' });
+    await user.click(picker);
+    await user.keyboard('{ArrowDown}');
+    await user.click(await screen.findByRole('option', { name: '40 × 30 mm' }));
+    const send = within(section).getByRole('button', { name: 'Print on server' });
+    await waitFor(() => expect(send).toBeEnabled());
+    await user.click(send);
+    expect(await screen.findByText('The printer finished this label.')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Yes, printed OK' })).toBeInTheDocument();
+    const batchId = pathOf(router).split('/').at(-1) ?? '';
+    expect(mock.lastCall('POST', capturePaths.labelServerJobs(batchId))?.body).toMatchObject({
+      code: '7KQ4MZ',
+      formatId: '40x30',
+    });
+    expect(print).not.toHaveBeenCalled();
+  });
+
   it('prints a selection from start cell 20, then asks "Printed OK?" and shows the first-print hint', async () => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => {});
     const { user, router } = await renderApp(

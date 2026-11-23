@@ -391,6 +391,7 @@ const ENGLISH: Record<SummaryKey, Sentence> = {
   'inbox.restore': () => 'Brought back an inbox item',
   'inbox.bulk': () => 'Changed several inbox items at once',
   'labels.printed': () => 'Printed labels',
+  'labels.print_server': () => 'Sent a label to the print server',
   'label_batch.dismiss': () => 'Set aside a label sheet that was not printed',
   'purchase.capture': () => 'Captured a receipt',
   'purchase.confirm': () => 'Confirmed a receipt',

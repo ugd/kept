@@ -79,6 +79,10 @@ export function labelsRoutes(state: MockState): MockRoute[] {
   const printedCodes = () => printedCodesOf(state);
 
   return [
+    route('GET', p.labelPrintServer, () => sessionGate(state) ?? reply(200, { formats: [] })),
+    route('GET', p.labelServerPreview(':id'), () => sessionGate(state) ?? notFound()),
+    route('POST', p.labelServerJobs(':id'), () => sessionGate(state) ?? notFound()),
+    route('GET', p.labelServerJob(':id', ':requestId'), () => sessionGate(state) ?? notFound()),
     route('POST', p.labelBatches, ({ body }) => {
       const gate = sessionGate(state);
       if (gate) return gate;

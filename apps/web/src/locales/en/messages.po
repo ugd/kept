@@ -29320,3 +29320,47 @@ msgstr "An owner or admin turns them on in a location's What to track."
 #: src/components/counts/counts-list.tsx
 msgid "Counts are off here: this lists the box checks."
 msgstr "Counts are off here: this lists the box checks."
+
+#: src/components/labels/server-print.tsx
+msgid "Check the physical label before printing again."
+msgstr "Check the physical label before printing again."
+
+#: src/components/labels/server-print.tsx
+msgid "Could not confirm the print request. Retrying the same request will not print it twice."
+msgstr "Could not confirm the print request. Retrying the same request will not print it twice."
+
+#: src/components/labels/server-print.tsx
+msgid "Print on server"
+msgstr "Print on server"
+
+#: src/components/labels/server-print.tsx
+msgid "Print server"
+msgstr "Print server"
+
+#: src/components/labels/server-print.tsx
+msgid "Retry print request"
+msgstr "Retry print request"
+
+#: src/components/labels/server-print.tsx
+msgid "Roll format"
+msgstr "Roll format"
+
+#: src/components/history/labels.tsx
+msgid "Sent a label to the print server"
+msgstr "Sent a label to the print server"
+
+#: src/components/labels/server-print.tsx
+msgid "The print server could not print the label."
+msgstr "The print server could not print the label."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished this label."
+msgstr "The printer finished this label."
+
+#: src/components/labels/server-print.tsx
+msgid "Waiting for the print server…"
+msgstr "Waiting for the print server…"
+
+#: src/components/labels/server-print.tsx
+msgid "{width} × {height} mm"
+msgstr "{width} × {height} mm"
