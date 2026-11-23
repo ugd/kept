@@ -58,6 +58,7 @@ export const Route = createFileRoute('/_print/labels/$batchId')({
 function PrintLabelsPage() {
   const { batchId } = Route.useParams();
   const search = Route.useSearch();
+  const navigate = useNavigate();
   const batch = useLabelBatch(batchId);
   const data = batch.data;
   const server = usePrintServer(data?.locationId);
@@ -76,35 +77,60 @@ function PrintLabelsPage() {
   );
   const formats = server.data?.formats ?? [];
   const browserRequested = search.mode === 'browser' || search.print === 1;
-  if (!browserRequested && server.isPending) {
+  if (server.isPending) {
     return (
       <div className="mx-auto max-w-lg p-4">
         <LoadingRows rows={2} />
       </div>
     );
   }
-  if (browserRequested || !formats.length) {
-    return (
-      <BrowserPrint
-        batch={data}
-        stock={stock}
-        updatedAt={batch.dataUpdatedAt}
-        hasServer={formats.length > 0}
-      />
-    );
+  if (!formats.length) {
+    return <BrowserPrint batch={data} stock={stock} updatedAt={batch.dataUpdatedAt} />;
   }
 
   return (
-    <>
-      <PrintHeader batch={data} actions={<PrintModeLink batchId={batchId} mode="browser" />} />
-      <main>
-        <ServerPrint key={batchId} batch={data} stock={stock} formats={formats} />
-      </main>
-    </>
+    <ServerPrint
+      key={batchId}
+      batch={data}
+      stock={stock}
+      formats={formats}
+      browserMode={browserRequested}
+      showServer={() =>
+        void navigate({
+          to: '/labels/$batchId',
+          params: { batchId },
+          search: (prev) => ({ ...prev, print: undefined, mode: undefined }),
+        })
+      }
+    >
+      {(action, details) =>
+        browserRequested ? (
+          <BrowserPrint
+            batch={data}
+            stock={stock}
+            updatedAt={batch.dataUpdatedAt}
+            serverAction={action}
+          />
+        ) : (
+          <>
+            <PrintHeader
+              batch={data}
+              actions={
+                <div className="flex flex-wrap items-center justify-between gap-2 md:justify-end">
+                  <BrowserPrintLink batchId={batchId} />
+                  {action}
+                </div>
+              }
+            />
+            {details}
+          </>
+        )
+      }
+    </ServerPrint>
   );
 }
 
-function PrintModeLink({ batchId, mode }: { batchId: string; mode: 'browser' | 'server' }) {
+function BrowserPrintLink({ batchId }: { batchId: string }) {
   return (
     <Link
       to="/labels/$batchId"
@@ -112,11 +138,11 @@ function PrintModeLink({ batchId, mode }: { batchId: string; mode: 'browser' | '
       search={(prev) => ({
         ...prev,
         print: undefined,
-        mode: mode === 'browser' ? 'browser' : undefined,
+        mode: 'browser',
       })}
       className="inline-flex min-h-11 items-center justify-self-start rounded-lg px-2 text-small font-semibold text-ink-2 underline underline-offset-2 outline-none hover:text-ink focus-visible:outline-2 focus-visible:outline-info"
     >
-      {mode === 'browser' ? <Trans>Browser printing</Trans> : <Trans>Print server</Trans>}
+      <Trans>Browser printing</Trans>
     </Link>
   );
 }
@@ -125,12 +151,12 @@ function BrowserPrint({
   batch: data,
   stock,
   updatedAt,
-  hasServer,
+  serverAction,
 }: {
   batch: LabelBatch;
   stock: LabelStock;
   updatedAt: number;
-  hasServer: boolean;
+  serverAction?: ReactNode;
 }) {
   const { t } = useLingui();
   const search = Route.useSearch();
@@ -209,12 +235,16 @@ function BrowserPrint({
         titleRef={titleRef}
         actions={
           <div className="grid gap-2 md:flex md:items-center">
-            {hasServer ? <PrintModeLink batchId={batchId} mode="server" /> : null}
+            {serverAction}
             <div
               data-slot="label-actions"
               className="grid grid-cols-2 gap-2 md:flex md:shrink-0 md:flex-row-reverse"
             >
-              <Button onPress={print} isDisabled={count === 0 || !encode || !ready}>
+              <Button
+                variant={serverAction ? 'secondary' : 'primary'}
+                onPress={print}
+                isDisabled={count === 0 || !encode || !ready}
+              >
                 <PrinterIcon className="size-5" />
                 <Trans>Print</Trans>
               </Button>
@@ -286,11 +316,7 @@ function PrintHeader({
 
   return (
     <header className="sticky top-0 z-20 grid gap-2 border-b border-line bg-paper px-3 py-2 print:hidden md:px-6">
-      <div
-        className={
-          stockTitle ? 'grid gap-2 md:flex md:items-center' : 'flex flex-wrap items-center gap-2'
-        }
-      >
+      <div className="grid gap-2 md:flex md:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Link
             to="/labels"

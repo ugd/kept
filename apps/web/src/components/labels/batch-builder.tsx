@@ -166,6 +166,7 @@ export function BatchBuilder({
   const pending = preview.data?.excluded.pending ?? 0;
 
   const server = usePrintServer(source.locationId);
+  const hasServer = !!server.data?.formats.length;
   const create = useMutation({
     mutationFn: (_destination: 'browser' | 'server') => captureApi.createLabelBatch(body),
     // The list changed under the preview (printed, trashed or pending since): show it as it is.
@@ -182,7 +183,7 @@ export function BatchBuilder({
       await navigate({
         to: '/labels/$batchId',
         params: { batchId: batch.id },
-        search: destination === 'browser' ? { print: 1 } : {},
+        search: destination === 'browser' ? { print: 1, mode: 'browser' } : {},
       });
     },
   });
@@ -287,23 +288,35 @@ export function BatchBuilder({
         ) : null}
         <div className="grid gap-2">
           <div className="flex flex-wrap gap-2">
-            <Button
-              onPress={() => create.mutate('browser')}
-              isPending={create.isPending}
-              isDisabled={count === 0 || preview.isError || preview.isPending}
-            >
-              <PrinterIcon className="size-5" />
-              {plural(count, { one: 'Print # label', other: 'Print # labels' })}
-            </Button>
-            {server.data?.formats.length ? (
+            {hasServer ? (
               <Button
-                variant="secondary"
                 onPress={() => create.mutate('server')}
+                isPending={create.isPending && create.variables === 'server'}
                 isDisabled={count === 0 || preview.isError || preview.isPending || create.isPending}
               >
+                <PrinterIcon className="size-5" />
                 <Trans>Print on server</Trans>
               </Button>
             ) : null}
+            <Button
+              variant={hasServer ? 'secondary' : 'primary'}
+              onPress={() => create.mutate('browser')}
+              isPending={create.isPending && create.variables === 'browser'}
+              isDisabled={
+                count === 0 ||
+                preview.isError ||
+                preview.isPending ||
+                create.isPending ||
+                server.isPending
+              }
+            >
+              <PrinterIcon className="size-5" />
+              {hasServer ? (
+                <Trans>Browser printing</Trans>
+              ) : (
+                plural(count, { one: 'Print # label', other: 'Print # labels' })
+              )}
+            </Button>
             <Link
               to="/labels"
               className="inline-flex min-h-11 items-center rounded-[10px] px-3 font-semibold text-ink underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-info"
@@ -311,19 +324,21 @@ export function BatchBuilder({
               <Trans>Back</Trans>
             </Link>
           </div>
-          <p className="m-0 text-small text-ink-2">
-            {sheet ? (
-              <Trans>
-                Opens the print dialog at {stockTitle}, scale 100%. Afterwards Kept asks "Printed
-                OK?" and records the print date.
-              </Trans>
-            ) : (
-              <Trans>
-                Opens the print dialog: choose your label printer and this label size. Afterwards
-                Kept asks "Printed OK?" and records the print date.
-              </Trans>
-            )}
-          </p>
+          {hasServer ? null : (
+            <p className="m-0 text-small text-ink-2">
+              {sheet ? (
+                <Trans>
+                  Opens the print dialog at {stockTitle}, scale 100%. Afterwards Kept asks "Printed
+                  OK?" and records the print date.
+                </Trans>
+              ) : (
+                <Trans>
+                  Opens the print dialog: choose your label printer and this label size. Afterwards
+                  Kept asks "Printed OK?" and records the print date.
+                </Trans>
+              )}
+            </p>
+          )}
         </div>
       </div>
 

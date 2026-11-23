@@ -1,11 +1,12 @@
 import { type LabelStock, newId, printedCode } from '@kept/shared';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { capturePaths } from '@/api/capture/paths';
 import type { LabelBatch, LabelPrintFormat } from '@/api/capture/types';
 import { api, isApiError } from '@/api/client';
 import { qs } from '@/api/inventory/paths';
+import { PrinterIcon } from '@/components/icons';
 import { LoadingRows, Notice, useErrorText } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
@@ -77,10 +78,16 @@ export function ServerPrint({
   batch,
   stock,
   formats,
+  browserMode,
+  showServer,
+  children,
 }: {
   batch: LabelBatch;
   stock: LabelStock;
   formats: LabelPrintFormat[];
+  browserMode: boolean;
+  showServer: () => void;
+  children: (action: ReactNode, details: ReactNode) => ReactNode;
 }) {
   const { t } = useLingui();
   const fmt = useFormat();
@@ -93,15 +100,16 @@ export function ServerPrint({
   const [request, setRequest] = useState(restored);
   const code =
     batch.labels.find((label) => label.code === selectedCode)?.code ?? batch.labels[0]?.code;
-  const format =
-    formats.find(({ id }) => id === selectedFormat) ??
-    formats.find(
-      ({ widthMm, heightMm }) => widthMm === stock.cell.w && heightMm === stock.cell.h,
-    ) ??
-    formats[0];
+  const matchingFormats = formats.filter(
+    ({ widthMm, heightMm }) => widthMm === stock.cell.w && heightMm === stock.cell.h,
+  );
+  const chosenFormat = browserMode ? undefined : formats.find(({ id }) => id === selectedFormat);
+  const format = chosenFormat ?? matchingFormats[0] ?? formats[0];
+  const direct =
+    batch.labels.length === 1 && (matchingFormats.length === 1 || formats.length === 1);
   const preview = useQuery({
     queryKey: ['labels', 'print-server', batch.id, code, format],
-    enabled: !!(code && format),
+    enabled: !!(code && format) && (!browserMode || direct),
     queryFn: ({ signal }) =>
       api.get<{ png: string }>(
         capturePaths.labelServerPreview(batch.id) + qs({ code, formatId: format?.id }),
@@ -136,7 +144,7 @@ export function ServerPrint({
     if (!send.isPending && result && !active(result)) rememberPrint(storageKey);
   }, [result, send.isPending, storageKey]);
 
-  if (!code || !format) return null;
+  if (!code || !format) return children(null, null);
   const print = () => {
     const next = retry && request ? request : { requestId: newId(), code, formatId: format.id };
     const unknownJob = isApiError(status.error) && status.error.status === 404;
@@ -148,6 +156,24 @@ export function ServerPrint({
       send.mutate(next);
     }
   };
+  const onPress = () => {
+    if (!browserMode || (direct && preview.data)) {
+      setFormat(format.id);
+      print();
+    }
+    if (browserMode) showServer();
+  };
+  const action = (
+    <Button
+      onPress={onPress}
+      isPending={send.isPending}
+      isDisabled={blocked || (browserMode ? direct && preview.isPending : !preview.data)}
+    >
+      <PrinterIcon className="size-5" />
+      {retry ? <Trans>Retry print request</Trans> : <Trans>Print on server</Trans>}
+    </Button>
+  );
+  if (browserMode) return children(action, null);
   const pickLabel = batch.labels.length > 1;
   const pickFormat = formats.length > 1;
   const rollName = ({ widthMm, heightMm }: LabelPrintFormat) => {
@@ -158,7 +184,8 @@ export function ServerPrint({
   const canConfirm =
     result?.state === 'done' && batch.labels.length === 1 && !batch.printedConfirmedAt;
 
-  return (
+  return children(
+    action,
     <section
       className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 print:hidden sm:py-8"
       aria-label={t`Print server`}
@@ -204,9 +231,6 @@ export function ServerPrint({
         </Notice>
       ) : null}
       <div className="grid justify-items-center gap-2 text-center">
-        <Button onPress={print} isPending={send.isPending} isDisabled={blocked || !preview.data}>
-          {retry ? <Trans>Retry print request</Trans> : <Trans>Print on server</Trans>}
-        </Button>
         <div role="status" className="text-small text-ink-2">
           {retry ? (
             <Trans>
@@ -234,6 +258,6 @@ export function ServerPrint({
           </Button>
         ) : null}
       </div>
-    </section>
+    </section>,
   );
 }

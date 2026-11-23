@@ -105,7 +105,9 @@ describe('the batch builder', () => {
     await user.click(picker);
     await user.keyboard('{ArrowDown}');
     await user.click(await screen.findByRole('option', { name: '50 × 30 mm' }));
-    const send = within(section).getByRole('button', { name: 'Print on server' });
+    const send = screen.getByRole('button', { name: 'Print on server' });
+    expect(send.closest('header')).toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: 'Print on server' })).toBeNull();
     await waitFor(() => expect(send).toBeEnabled());
     await user.click(send);
     expect(await screen.findByText('The printer finished this label.')).toBeInTheDocument();
@@ -522,13 +524,13 @@ describe('the print view', () => {
     ...over,
   });
 
-  it('keeps the selected 40 × 40 mm roll when switching print modes', async () => {
+  it('sends the selected 40 × 40 mm roll from the browser toolbar without a browser dialog', async () => {
     const state = ownerScenario();
     const saved = batch();
     state.capture.labelBatches.unshift(saved);
     const preview = vi.fn();
     const print = vi.spyOn(window, 'print').mockImplementation(() => {});
-    const { user, router } = await renderApp(`/labels/${saved.id}?stock=thermal_40x40`, {
+    const { user, router, mock } = await renderApp(`/labels/${saved.id}?stock=thermal_40x40`, {
       state,
       setup(mock) {
         mock.on('GET', capturePaths.labelPrintServer, () => ({
@@ -541,6 +543,7 @@ describe('the print view', () => {
           preview(query.get('formatId'));
           return { png: 'aGVsbG8=' };
         });
+        mock.on('POST', capturePaths.labelServerJobs(':id'), () => reply(202, { state: 'done' }));
       },
     });
     const section = await screen.findByRole('region', { name: 'Print server' });
@@ -558,10 +561,44 @@ describe('the print view', () => {
     expect(screen.queryByRole('region', { name: 'Print server' })).toBeNull();
     expect(router.state.location.search).toMatchObject({ stock: 'thermal_40x40', mode: 'browser' });
 
-    await user.click(screen.getByRole('link', { name: 'Print server' }));
+    const send = screen.getByRole('button', { name: 'Print on server' });
+    expect(send.closest('header')).toBeInTheDocument();
+    const jobs = capturePaths.labelServerJobs(saved.id);
+    expect(mock.lastCall('POST', jobs)).toBeUndefined();
+    await waitFor(() => expect(send).toBeEnabled());
+    await user.click(send);
     await screen.findByRole('region', { name: 'Print server' });
+    expect(await screen.findByText('The printer finished this label.')).toBeInTheDocument();
+    const submission = mock.lastCall('POST', jobs);
+    expect(submission?.body).toMatchObject({ code: 'AR7HDM', formatId: '40x40' });
+    expect(submission?.headers['idempotency-key']).toBeTruthy();
+    expect(
+      mock.calls.filter(({ method, path }) => method === 'POST' && path === jobs),
+    ).toHaveLength(1);
     expect(screen.queryByRole('region', { name: 'Sheet 1 of 1' })).toBeNull();
     expect(print).not.toHaveBeenCalled();
+  });
+
+  it('opens label selection from the toolbar when the batch has several labels', async () => {
+    const state = ownerScenario();
+    const saved = batch();
+    const first = saved.labels[0];
+    if (!first) throw new Error('Missing test label');
+    saved.labels.push({ ...first, code: '654321', name: 'Other label' });
+    state.capture.labelBatches.unshift(saved);
+    const { user, mock } = await renderApp(`/labels/${saved.id}?mode=browser`, {
+      state,
+      setup(mock) {
+        mock.on('GET', capturePaths.labelPrintServer, () => ({
+          formats: [{ id: '50x30', widthMm: 50, heightMm: 30, dotsPerMm: 8 }],
+        }));
+        mock.on('GET', capturePaths.labelServerPreview(':id'), () => ({ png: 'aGVsbG8=' }));
+      },
+    });
+    await user.click(await screen.findByRole('button', { name: 'Print on server' }));
+    const section = await screen.findByRole('region', { name: 'Print server' });
+    expect(within(section).getByRole('combobox', { name: 'Label' })).toBeInTheDocument();
+    expect(mock.lastCall('POST', capturePaths.labelServerJobs(saved.id))).toBeUndefined();
   });
 
   it('keeps an Arabic name in its own direction and the code left to right, in Arabic', async () => {
