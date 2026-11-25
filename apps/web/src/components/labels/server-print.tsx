@@ -8,7 +8,7 @@ import type { LabelBatch, LabelPrintFormat } from '@/api/capture/types';
 import { api, isApiError } from '@/api/client';
 import { qs } from '@/api/inventory/paths';
 import { useLocation } from '@/api/queries';
-import { PlusIcon, PrinterIcon } from '@/components/icons';
+import { BoxIcon, PlusIcon, PrinterIcon } from '@/components/icons';
 import { LoadingRows, Notice, useErrorText } from '@/components/page';
 import { parseNumber } from '@/components/things/form-model';
 import { Button } from '@/components/ui/button';
@@ -73,19 +73,29 @@ function Preview({ png }: { png: string }) {
   ) : null;
 }
 
-function AddNextThing({ locationId }: { locationId: string }) {
+function AddNextItem({ locationId }: { locationId: string }) {
+  const { t } = useLingui();
   const location = useLocation(locationId);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<'thing' | 'box' | null>(null);
   if (!location.data || !can(location.data.role, 'things.edit')) return null;
   return (
     <>
-      <Button variant="secondary" size="small" onPress={() => setAdding(true)}>
+      <Button variant="secondary" size="small" onPress={() => setAdding('thing')}>
         <PlusIcon className="size-4" />
         <Trans>Add a thing</Trans>
       </Button>
+      <Button variant="secondary" size="small" onPress={() => setAdding('box')}>
+        <BoxIcon className="size-4" />
+        <Trans>Add a box</Trans>
+      </Button>
       {adding ? (
         <Suspense fallback={null}>
-          <CreateThingSheet isOpen locationId={locationId} onClose={() => setAdding(false)} />
+          <CreateThingSheet
+            isOpen
+            locationId={locationId}
+            onClose={() => setAdding(null)}
+            {...(adding === 'box' ? { title: t`Add a box`, presetType: 'box_bin' } : {})}
+          />
         </Suspense>
       ) : null}
     </>
@@ -352,7 +362,7 @@ export function ServerPrint({
                 <Trans>Yes, printed OK</Trans>
               </Button>
             ) : null}
-            {canAdd ? <AddNextThing locationId={batch.locationId} /> : null}
+            {canAdd ? <AddNextItem locationId={batch.locationId} /> : null}
           </div>
         ) : null}
       </div>

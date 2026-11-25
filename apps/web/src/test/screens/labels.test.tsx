@@ -678,6 +678,39 @@ describe('the print view', () => {
     );
   });
 
+  it('adds a box in the printed batch’s location with the Box / bin type', async () => {
+    const state = ownerScenario();
+    const saved = batch({ printedConfirmedAt: '2026-10-06T08:01:00Z' });
+    state.capture.labelBatches.unshift(saved);
+    const { user, mock } = await renderApp(`/labels/${saved.id}`, {
+      state,
+      setup(mock) {
+        mock.on('GET', capturePaths.labelPrintServer, () => ({
+          formats: [{ id: '50x30', widthMm: 50, heightMm: 30, dotsPerMm: 8 }],
+        }));
+        mock.on('GET', capturePaths.labelServerPreview(':id'), () => ({ png: 'aGVsbG8=' }));
+      },
+    });
+    await user.click(await screen.findByRole('button', { name: 'Add a box' }));
+    const form = within(await screen.findByRole('dialog', { name: 'Add a box' }));
+    await waitFor(() =>
+      expect(form.getByRole('combobox', { name: 'Type' })).toHaveValue('Box / bin'),
+    );
+    await user.type(form.getByRole('textbox', { name: 'Name' }), 'New storage box');
+    const place = form.getByRole('combobox', { name: 'Where it is' });
+    await waitFor(() => expect(place).toBeEnabled());
+    await user.type(place, 'Unplaced');
+    await user.click(await screen.findByRole('option', { name: 'Unplaced' }));
+    await user.click(form.getByRole('button', { name: 'Add' }));
+    expect(await findHeading('New storage box')).toBeInTheDocument();
+    expect(mock.lastCall('POST', p.things)?.body).toMatchObject({
+      name: 'New storage box',
+      locationId: saved.locationId,
+      placeId: INV_IDS.place.familyUnplaced,
+      typeId: INV_IDS.type.boxBin,
+    });
+  });
+
   it('keeps an Arabic name in its own direction and the code left to right, in Arabic', async () => {
     const state = ownerScenario();
     state.capture.labelBatches.unshift(batch());

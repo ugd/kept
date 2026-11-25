@@ -110,6 +110,7 @@ export function TypePicker({
   label,
   errorMessage,
   exclude,
+  containersOnly = false,
 }: {
   accountId: string;
   value: string | null;
@@ -117,13 +118,18 @@ export function TypePicker({
   label: ReactNode;
   errorMessage?: string;
   exclude?: string;
+  containersOnly?: boolean;
 }) {
   const { t } = useLingui();
   const { options, byId } = useTypeOptions(accountId);
   return (
     <Combobox<IconOption>
       label={label}
-      items={options.filter((o) => o.id !== exclude)}
+      items={options.filter(
+        (o) =>
+          o.id !== exclude &&
+          (!containersOnly || byId.get(String(o.id))?.resolvedCapabilities.includes('container')),
+      )}
       selectedKey={value}
       onSelectionChange={(k: Key | null) =>
         onChange(k ? String(k) : null, k ? byId.get(String(k)) : undefined)

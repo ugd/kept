@@ -60,7 +60,9 @@ function presetTypeOf(
   return typeOfKey(types, key, (x) => !x.isFieldGroup && !x.archivedAt);
 }
 
-type Errors = Partial<Record<'name' | 'where' | 'quantity' | 'price' | 'currency', string>>;
+type Errors = Partial<
+  Record<'name' | 'type' | 'where' | 'quantity' | 'price' | 'currency', string>
+>;
 
 export function CreateThingSheet({
   isOpen,
@@ -126,7 +128,10 @@ export function CreateThingSheet({
     extra: Pick<CreateThingBody, 'colour' | 'notes' | 'tagIds' | 'aliases' | 'custom'>;
   } | null>(null);
   const types = useTypes(accountId);
-  const type = picked ? picked.type : presetTypeOf(types.data?.types, presetType);
+  const box = presetType === 'box_bin';
+  const selectedType = picked ? picked.type : presetTypeOf(types.data?.types, presetType);
+  const type =
+    box && !selectedType?.resolvedCapabilities.includes('container') ? undefined : selectedType;
   const setType = (ty: TypeNode | undefined) => setPicked({ type: ty });
   const fromTemplate = (x: Template) => {
     const p = prefillOf(x);
@@ -179,6 +184,7 @@ export function CreateThingSheet({
     const e: Errors = {};
     if (!name.trim()) e.name = t`Give it a name.`;
     else if (name.trim().length > 200) e.name = t`At most 200 characters.`;
+    if (box && !type) e.type = t`Choose a type`;
     if (!isChosen(where.target)) e.where = t`Choose where it is.`;
     const q = quantityForced ? 1 : parseNumber(quantity);
     if (q === null || Number.isNaN(q) || q < 0 || !Number.isInteger(q))
@@ -315,7 +321,7 @@ export function CreateThingSheet({
     >
       <form
         noValidate
-        aria-label={t`Add a thing`}
+        aria-label={box ? t`Add a box` : t`Add a thing`}
         className="grid gap-3.5"
         onSubmit={(ev) => {
           ev.preventDefault();
@@ -330,7 +336,7 @@ export function CreateThingSheet({
           inputProps={{ dir: 'auto' }}
           {...(errors.name ? { errorMessage: errors.name, isInvalid: true } : {})}
         />
-        {!name.trim() ? (
+        {!box && !name.trim() ? (
           <FromTemplate locationId={where.locationId} onPick={fromTemplate} />
         ) : template ? (
           <p className="m-0 text-small text-ink-2">
@@ -344,10 +350,21 @@ export function CreateThingSheet({
           label={t`Type`}
           value={type?.id ?? null}
           onChange={(_id, ty) => setType(ty)}
+          containersOnly={box}
+          {...(!type && errors.type ? { errorMessage: errors.type } : {})}
         />
         {target ? null : (
           <div className="grid gap-1">
-            <WherePicker value={where} onChange={setWhere} label={t`Where it is`} />
+            <WherePicker
+              value={where}
+              onChange={(next) => {
+                if (box && next.locationId !== where.locationId) {
+                  setPicked(null);
+                }
+                setWhere(next);
+              }}
+              label={t`Where it is`}
+            />
             {errors.where ? (
               <span role="alert" className="text-small font-medium text-danger">
                 {errors.where}
@@ -460,7 +477,7 @@ export function CreateThingSheet({
           <Button variant="secondary" onPress={onClose}>
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" isPending={busy}>
+          <Button type="submit" isPending={busy} isDisabled={box && types.isPending}>
             <Trans>Add</Trans>
           </Button>
         </DialogFooter>
