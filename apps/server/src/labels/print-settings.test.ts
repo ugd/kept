@@ -14,7 +14,8 @@ const formats = [{ id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30,
 const submissions: {
   id: string;
   format: (typeof formats)[number];
-  png: string;
+  png?: string;
+  pngs?: string[];
   copies?: number;
 }[] = [];
 const bridge = createServer(async (req, res) => {
@@ -22,7 +23,7 @@ const bridge = createServer(async (req, res) => {
     res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
   if (req.headers.authorization !== `Bearer ${token}`) return answer(401, { ok: false });
   if (req.method === 'GET' && req.url === '/api/kept/v1/health')
-    return answer(200, { ok: true, maxCopies: MAX_LABEL_PRINT_COPIES });
+    return answer(200, { ok: true, maxCopies: MAX_LABEL_PRINT_COPIES, maxLabels: 1000 });
   if (req.method === 'POST' && req.url === '/api/kept/v1/jobs') {
     let payload = '';
     for await (const chunk of req) payload += chunk;
@@ -93,7 +94,11 @@ it('saves and removes a location print connection while keeping its token out of
     db,
     "INSERT INTO public.instance_settings (key, value) VALUES ('ssrf_allow_private', 'true')",
   );
-  expect((await check()).json()).toEqual({ ok: true, maxCopies: MAX_LABEL_PRINT_COPIES });
+  expect((await check()).json()).toEqual({
+    ok: true,
+    maxCopies: MAX_LABEL_PRINT_COPIES,
+    maxLabels: 1000,
+  });
   expect(submissions).toHaveLength(0);
   const sealed = await own<{ config_ciphertext: unknown }>(
     db,
@@ -105,7 +110,7 @@ it('saves and removes a location print connection while keeping its token out of
 
   const created = await call(app, '/api/v1/labels/batches', {
     as: louis,
-    body: { locationId: home.id, kind: 'blank', blankCount: 1, stock: 'a4_24_70x37' },
+    body: { locationId: home.id, kind: 'blank', blankCount: 2, stock: 'a4_24_70x37' },
   });
   expect(created.statusCode, created.body).toBe(201);
   const { batch } = created.json();
@@ -128,6 +133,15 @@ it('saves and removes a location print connection while keeping its token out of
     width: 384,
     height: 240,
   });
+  const all = { formatId: '50x30', all: true, requestId: newId(), copies: 2 };
+  expect((await call(app, jobs, { as: louis, body: all })).json()).toEqual({ state: 'queued' });
+  expect(submissions).toHaveLength(2);
+  const bulk = submissions[1];
+  expect(bulk).toMatchObject({ copies: 2, format: formats[0] });
+  expect(bulk?.png).toBeUndefined();
+  expect(bulk?.pngs).toHaveLength(2);
+  expect(bulk?.pngs?.[0]).toBe(sent?.png);
+  expect(bulk?.pngs?.[1]).not.toBe(sent?.png);
 
   expect((await call(app, route, { as: ibrahim, method: 'DELETE' })).statusCode).toBe(204);
   const events = (await auditOf(db, home.id)).filter(({ action }) =>

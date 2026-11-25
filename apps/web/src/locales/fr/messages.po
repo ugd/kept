@@ -29452,3 +29452,31 @@ msgstr "Exemplaires"
 #: src/components/scan/session/session-screen.tsx
 msgid "Counts are off there"
 msgstr "Les comptages sont désactivés là-bas"
+
+#: src/components/labels/server-print.tsx
+msgid "{labelCount, plural, one {Print # label} other {Print # labels}}"
+msgstr "{labelCount, plural, one {Imprimer # étiquette} other {Imprimer # étiquettes}}"
+
+#: src/components/labels/server-print.tsx
+msgid "Check the printed labels before printing again."
+msgstr "Vérifiez les étiquettes imprimées avant de relancer l’impression."
+
+#: src/components/labels/server-print.tsx
+msgid "Copies per label"
+msgstr "Copies par étiquette"
+
+#: src/components/labels/server-print.tsx
+msgid "Label to preview"
+msgstr "Étiquette à prévisualiser"
+
+#: src/components/labels/server-print.tsx
+msgid "Printed {doneLabels} of {totalLabels} labels."
+msgstr "{doneLabels} étiquettes imprimées sur {totalLabels}."
+
+#: src/components/labels/server-print.tsx
+msgid "Printing stopped before all labels finished."
+msgstr "L’impression s’est arrêtée avant la fin du lot."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished all labels."
+msgstr "L’imprimante a fini d’imprimer toutes les étiquettes."

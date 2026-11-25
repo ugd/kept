@@ -1,4 +1,5 @@
 import { type LabelStock, MAX_LABEL_PRINT_COPIES, newId, printedCode } from '@kept/shared';
+import { plural } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -16,9 +17,13 @@ import { TextField } from '@/components/ui/text-field';
 import { useFormat } from '@/lib/format';
 import { useConfirmPrinted } from './printed-ok';
 
-type Job = { state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain' };
-type Choice = { code: string; formatId: string };
-type PrintRequest = Choice & { requestId: string; copies: number };
+type Job = {
+  state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain';
+  totalLabels?: number;
+  printedLabels?: number;
+};
+type Selection = { all: true; code?: never } | { all?: never; code: string };
+type PrintRequest = Selection & { requestId: string; formatId: string; copies: number };
 
 function validCopies(copies: unknown): copies is number {
   return (
@@ -68,16 +73,17 @@ function restorePrint(key: string): PrintRequest | undefined {
     const saved = JSON.parse(sessionStorage.getItem(key) ?? 'null');
     if (
       typeof saved?.requestId === 'string' &&
-      typeof saved.code === 'string' &&
       typeof saved.formatId === 'string' &&
       (saved.copies === undefined || validCopies(saved.copies))
-    )
-      return {
+    ) {
+      const job = {
         requestId: saved.requestId,
-        code: saved.code,
         formatId: saved.formatId,
         copies: saved.copies ?? 1,
       };
+      if (saved.all === true) return { ...job, all: true };
+      if (typeof saved.code === 'string') return { ...job, code: saved.code };
+    }
   } catch {
     // Printing is still available on devices that block session storage.
   }
@@ -120,8 +126,9 @@ export function ServerPrint({
   const [request, setRequest] = useState(restored);
   const [prompt, setPrompt] = useState<string | null>(initiallyOpen ? '1' : null);
   const promptOpen = prompt !== null;
-  const rollInput = useRef<HTMLInputElement>(null);
   const copiesInput = useRef<HTMLInputElement>(null);
+  const labelCount = batch.labels.length;
+  const multiple = labelCount > 1;
   const code =
     batch.labels.find((label) => label.code === selectedCode)?.code ?? batch.labels[0]?.code;
   const matchingFormats = formats.filter(
@@ -165,10 +172,7 @@ export function ServerPrint({
   const blocked =
     send.isPending || (tracking && status.isPending) || (active(result) && !status.isError);
   const rejected = isApiError(send.error) && send.error.code === 'validation';
-  const retry =
-    request?.code === code &&
-    request?.formatId === format?.id &&
-    ((send.isError && !rejected) || status.isError);
+  const retry = !!request && ((send.isError && !rejected) || status.isError);
   useEffect(() => {
     if (!send.isPending && result && !active(result)) rememberPrint(storageKey);
   }, [result, send.isPending, storageKey]);
@@ -177,8 +181,9 @@ export function ServerPrint({
   const describeError = (error: unknown) =>
     isApiError(error) && error.code === 'validation' && error.hint ? error.hint : errorText(error);
   const print = (copies: number) => {
+    const choice: Selection = multiple ? { all: true } : { code };
     const next =
-      retry && request ? request : { requestId: newId(), code, formatId: format.id, copies };
+      retry && request ? request : { ...choice, requestId: newId(), formatId: format.id, copies };
     const unknownJob = isApiError(status.error) && status.error.status === 404;
     if (retry && status.isError && !unknownJob) {
       void status.refetch();
@@ -211,65 +216,60 @@ export function ServerPrint({
     id: label.code,
     label: label.name ?? printedCode(label.code),
   }));
-  const pickLabel = batch.labels.length > 1;
   const pickFormat = formats.length > 1;
   const rollName = ({ widthMm, heightMm }: LabelPrintFormat) => {
     const width = fmt.num(widthMm);
     const height = fmt.num(heightMm);
     return t`${width} × ${height} mm`;
   };
+  const batchJob = request?.all === true;
   const canConfirm =
-    result?.state === 'done' && batch.labels.length === 1 && !batch.printedConfirmedAt;
+    result?.state === 'done' && (!multiple || batchJob) && !batch.printedConfirmedAt;
+  const doneLabels = result?.printedLabels;
+  const totalLabels = result?.totalLabels;
   const copies = parseNumber(prompt ?? '');
   // The job route validates and renders the selected format even if its preview is still loading.
   const canPrint = validCopies(copies) && !preview.isError && !blocked;
 
-  const choices = (inDialog: boolean) => (
-    <div className={pickLabel && pickFormat ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
-      {pickLabel ? (
-        <Combobox
-          label={t`Label`}
-          items={labelOptions}
-          selectedKey={code}
-          defaultInputValue={labelOptions.find((label) => label.id === code)?.label}
-          isDisabled={blocked}
-          showsChoice
-          autoFocus={inDialog}
-          onConfirmChoice={
-            inDialog ? () => (pickFormat ? rollInput : copiesInput).current?.focus() : undefined
-          }
-          onSelectionChange={(key) => {
-            if (key !== null) setCode(String(key));
-          }}
-        />
-      ) : null}
-      {pickFormat ? (
-        <Combobox
-          label={t`Roll format`}
-          items={formats.map((item) => ({ id: item.id, label: rollName(item) }))}
-          selectedKey={format.id}
-          defaultInputValue={rollName(format)}
-          isDisabled={blocked}
-          showsChoice
-          autoFocus={inDialog && !pickLabel}
-          inputProps={inDialog ? { ref: rollInput } : undefined}
-          onConfirmChoice={inDialog ? () => copiesInput.current?.focus() : undefined}
-          onSelectionChange={(key) => {
-            if (key !== null) setFormat(String(key));
-          }}
-        />
-      ) : (
-        <p className="m-0 text-center text-small text-ink-2">{rollName(format)}</p>
-      )}
-    </div>
-  );
+  const rollPicker = (inDialog: boolean) =>
+    pickFormat ? (
+      <Combobox
+        label={t`Roll format`}
+        items={formats.map((item) => ({ id: item.id, label: rollName(item) }))}
+        selectedKey={format.id}
+        defaultInputValue={rollName(format)}
+        isDisabled={blocked}
+        showsChoice
+        autoFocus={inDialog}
+        onConfirmChoice={inDialog ? () => copiesInput.current?.focus() : undefined}
+        onSelectionChange={(key) => {
+          if (key !== null) setFormat(String(key));
+        }}
+      />
+    ) : (
+      <p className="m-0 text-center text-small text-ink-2">{rollName(format)}</p>
+    );
 
   const details = browserMode ? null : (
     <section
       className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 print:hidden sm:py-8"
       aria-label={t`Print server`}
     >
-      {choices(false)}
+      <div className={multiple && pickFormat ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
+        {multiple ? (
+          <Combobox
+            label={t`Label to preview`}
+            items={labelOptions}
+            selectedKey={code}
+            defaultInputValue={labelOptions.find((label) => label.id === code)?.label}
+            showsChoice
+            onSelectionChange={(key) => {
+              if (key !== null) setCode(String(key));
+            }}
+          />
+        ) : null}
+        {rollPicker(false)}
+      </div>
       {preview.isPending ? <LoadingRows rows={2} /> : null}
       {preview.data ? <Preview png={preview.data.png} /> : null}
       {preview.isError ? <Notice tone="danger">{describeError(preview.error)}</Notice> : null}
@@ -282,13 +282,35 @@ export function ServerPrint({
               twice.
             </Trans>
           ) : null}
-          {blocked ? <Trans>Waiting for the print server…</Trans> : null}
-          {result?.state === 'done' ? <Trans>The printer finished this label.</Trans> : null}
+          {blocked && doneLabels === undefined ? (
+            <Trans>Waiting for the print server…</Trans>
+          ) : null}
+          {batchJob && doneLabels !== undefined && totalLabels !== undefined ? (
+            <p className="m-0">
+              <Trans>
+                Printed {doneLabels} of {totalLabels} labels.
+              </Trans>
+            </p>
+          ) : null}
+          {result?.state === 'done' && !batchJob ? (
+            <Trans>The printer finished this label.</Trans>
+          ) : null}
+          {result?.state === 'done' && batchJob && doneLabels === undefined ? (
+            <Trans>The printer finished all labels.</Trans>
+          ) : null}
           {result?.state === 'failed' ? (
-            <Trans>The print server could not print the label.</Trans>
+            batchJob ? (
+              <Trans>Printing stopped before all labels finished.</Trans>
+            ) : (
+              <Trans>The print server could not print the label.</Trans>
+            )
           ) : null}
           {result?.state === 'uncertain' ? (
-            <Trans>Check the physical label before printing again.</Trans>
+            batchJob ? (
+              <Trans>Check the printed labels before printing again.</Trans>
+            ) : (
+              <Trans>Check the physical label before printing again.</Trans>
+            )
           ) : null}
         </div>
         {canConfirm ? (
@@ -330,11 +352,11 @@ export function ServerPrint({
               if (browserMode) showServer();
             }}
           >
-            {choices(true)}
+            {rollPicker(true)}
             <TextField
-              autoFocus={!pickLabel && !pickFormat}
+              autoFocus={!pickFormat}
               inputProps={{ ref: copiesInput }}
-              label={t`Copies`}
+              label={multiple ? t`Copies per label` : t`Copies`}
               errorMessage={`${fmt.num(1)}–${fmt.num(MAX_LABEL_PRINT_COPIES)}`}
               inputMode="numeric"
               isRequired
@@ -348,7 +370,11 @@ export function ServerPrint({
                 <Trans>Cancel</Trans>
               </Button>
               <Button type="submit" isDisabled={!canPrint}>
-                <Trans>Print</Trans>
+                {multiple ? (
+                  plural(labelCount, { one: 'Print # label', other: 'Print # labels' })
+                ) : (
+                  <Trans>Print</Trans>
+                )}
               </Button>
             </DialogFooter>
           </form>

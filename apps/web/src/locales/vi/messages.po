@@ -21500,3 +21500,31 @@ msgstr "Số bản in"
 #: src/components/scan/session/session-screen.tsx
 msgid "Counts are off there"
 msgstr "Kiểm kê đang tắt ở đó"
+
+#: src/components/labels/server-print.tsx
+msgid "{labelCount, plural, one {Print # label} other {Print # labels}}"
+msgstr "{labelCount, plural, other {In # nhãn}}"
+
+#: src/components/labels/server-print.tsx
+msgid "Check the printed labels before printing again."
+msgstr "Hãy kiểm tra các nhãn đã in trước khi in lại."
+
+#: src/components/labels/server-print.tsx
+msgid "Copies per label"
+msgstr "Số bản sao cho mỗi nhãn"
+
+#: src/components/labels/server-print.tsx
+msgid "Label to preview"
+msgstr "Nhãn để xem trước"
+
+#: src/components/labels/server-print.tsx
+msgid "Printed {doneLabels} of {totalLabels} labels."
+msgstr "Đã in {doneLabels} trong số {totalLabels} nhãn."
+
+#: src/components/labels/server-print.tsx
+msgid "Printing stopped before all labels finished."
+msgstr "Quá trình in đã dừng trước khi in hết nhãn."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished all labels."
+msgstr "Máy in đã in xong tất cả nhãn."

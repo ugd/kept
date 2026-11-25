@@ -24,6 +24,8 @@ export const PrintFormat = z
 export type PrintFormat = z.infer<typeof PrintFormat>;
 export const PrintServerState = z.object({
   state: z.enum(['queued', 'printing', 'done', 'failed', 'uncertain']),
+  totalLabels: z.number().int().positive().optional(),
+  printedLabels: z.number().int().nonnegative().optional(),
 });
 
 export function printServerUrl(value: string): string {
@@ -66,6 +68,7 @@ export const PrintConnectionView = z.object({
 export const PrintServerHealth = z.object({
   ok: z.literal(true),
   maxCopies: z.number().int().positive().optional(),
+  maxLabels: z.number().int().positive().optional(),
 });
 
 const publicFetch = guardedFetch({ allowPrivate: false });
@@ -144,9 +147,19 @@ export function printServer(
 
   return {
     check: () => call('health', PrintServerHealth),
-    submit: async (id: string, format: PrintFormat, png: Buffer, copies = 1) => {
-      if (copies > 1) {
-        const { maxCopies = 1 } = await call('health', PrintServerHealth);
+    submit: async (id: string, format: PrintFormat, png: Buffer | Buffer[], copies = 1) => {
+      const images = Array.isArray(png) ? png : [png];
+      const first = images[0];
+      if (!first) throw invalid();
+      if (images.length > 1 || copies > 1) {
+        const { maxCopies = 1, maxLabels = 1 } = await call('health', PrintServerHealth);
+        if (images.length > maxLabels) {
+          throw invalid(
+            maxLabels === 1
+              ? 'Update the print server to print multiple labels in one job.'
+              : `The print server supports up to ${maxLabels} labels per job.`,
+          );
+        }
         if (copies > maxCopies) {
           throw invalid(
             maxCopies === 1
@@ -158,7 +171,9 @@ export function printServer(
       return call('jobs', PrintServerState, {
         id,
         format,
-        png: png.toString('base64'),
+        ...(images.length === 1
+          ? { png: first.toString('base64') }
+          : { pngs: images.map((image) => image.toString('base64')) }),
         ...(copies > 1 ? { copies } : {}),
       });
     },

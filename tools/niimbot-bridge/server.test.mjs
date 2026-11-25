@@ -13,7 +13,7 @@ for (const format of [
     const server = makeServer({
       token,
       database: ':memory:',
-      async printLabel(png) {
+      async printLabels([png]) {
         print(png);
       },
     });
@@ -53,7 +53,7 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
   const server = makeServer({
     token,
     database: ':memory:',
-    async printLabel(png, copies) {
+    async printLabels([png], copies) {
       printed = png;
       copiesPrinted = copies;
       calls += 1;
@@ -70,7 +70,7 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
   assert.equal((await fetch(health)).status, 401);
   assert.deepEqual(
     await (await fetch(health, { headers: { Authorization: `Bearer ${token}` } })).json(),
-    { ok: true, maxCopies: 0x7fff },
+    { ok: true, maxCopies: 0x7fff, maxLabels: 1000 },
   );
   assert.equal(calls, 0);
   const png = await sharp({ create: { width: 96, height: 240, channels: 3, background: 'white' } })
@@ -102,4 +102,61 @@ test('the bridge validates the raster, authorizes Kept and prints a retry just o
   assert.equal(calls, 1);
   assert.equal(copiesPrinted, 3);
   assert.deepEqual(printed, png);
+});
+
+test('a batch validates every label before printing and preserves partial progress on retry', async (t) => {
+  const token = 'test-only-bridge-token';
+  const firstDone = Promise.withResolvers();
+  const next = Promise.withResolvers();
+  const received = [];
+  const server = makeServer({
+    token,
+    database: ':memory:',
+    async printLabels(images, copies, onLabelPrinted) {
+      received.push({ images, copies });
+      onLabelPrinted();
+      firstDone.resolve();
+      await next.promise;
+      throw Object.assign(new Error('Lost printer status'), { uncertain: true });
+    },
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    next.resolve();
+    server.close();
+  });
+  const base = `http://127.0.0.1:${server.address().port}/api/kept/v1/jobs`;
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const images = [];
+  for (const background of ['white', 'black']) {
+    images.push(
+      await sharp({ create: { width: 384, height: 240, channels: 3, background } })
+        .png()
+        .toBuffer(),
+    );
+  }
+  const id = 'de'.repeat(16);
+  const job = {
+    id,
+    format: { id: '50x30', widthMm: 50, printableWidthMm: 48, heightMm: 30, dotsPerMm: 8 },
+    copies: 2,
+    pngs: images.map((image) => image.toString('base64')),
+  };
+  const post = (body) => fetch(base, { method: 'POST', headers, body: JSON.stringify(body) });
+  assert.equal((await post({ ...job, pngs: [job.pngs[0], 'bad raster'] })).status, 422);
+  assert.equal(received.length, 0);
+  assert.equal((await post(job)).status, 202);
+  await firstDone.promise;
+  assert.deepEqual(await (await post(job)).json(), {
+    state: 'printing',
+    totalLabels: 2,
+    printedLabels: 1,
+  });
+  assert.equal((await post({ ...job, pngs: [...job.pngs].reverse() })).status, 409);
+  assert.equal((await post({ ...job, id: 'ff'.repeat(16) })).status, 409);
+  next.resolve();
+  const status = await fetch(`${base}/${id}`, { headers });
+  assert.deepEqual(await status.json(), { state: 'uncertain', totalLabels: 2, printedLabels: 1 });
+  assert.equal((await post(job)).status, 200);
+  assert.deepEqual(received, [{ images, copies: 2 }]);
 });

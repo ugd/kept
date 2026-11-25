@@ -9,7 +9,9 @@ import { makePrinter } from './printer.mjs';
 const path = '/api/kept/v1/jobs';
 const hash = (value) => createHash('sha256').update(value).digest();
 const jobId = /^[a-f0-9]{32}$/;
-const maxBytes = 128 * 1024;
+const MAX_PNG_LENGTH = 128 * 1024;
+const MAX_JOB_BYTES = 16 * 1024 * 1024;
+const MAX_LABELS = 1000;
 const pngMagic = Buffer.from('89504e470d0a1a0a', 'hex');
 const MAX_ROLL_WIDTH_MM = 50;
 const MAX_PRINTABLE_WIDTH_MM = 48;
@@ -28,15 +30,20 @@ async function readPrint(request) {
     let size = 0;
     for await (const chunk of request.iterator({ destroyOnReturn: false })) {
       size += chunk.length;
-      if (size > maxBytes) return null;
+      if (size > MAX_JOB_BYTES) return null;
       chunks.push(chunk);
     }
-    const { id, format, png, copies = 1 } = JSON.parse(Buffer.concat(chunks).toString());
+    const { id, format, png, pngs, copies = 1 } = JSON.parse(Buffer.concat(chunks).toString());
     const { widthMm, heightMm, dotsPerMm, printableWidthMm = widthMm } = format ?? {};
     if (
       typeof id !== 'string' ||
       !jobId.test(id) ||
-      typeof png !== 'string' ||
+      (pngs === undefined
+        ? typeof png !== 'string'
+        : png !== undefined ||
+          !Array.isArray(pngs) ||
+          pngs.length < 2 ||
+          pngs.length > MAX_LABELS) ||
       !Number.isInteger(copies) ||
       copies < 1 ||
       copies > MAX_COPIES ||
@@ -52,35 +59,47 @@ async function readPrint(request) {
       heightMm > 200
     )
       return null;
-    const image = Buffer.from(png, 'base64');
-    if (!image.subarray(0, pngMagic.length).equals(pngMagic)) return null;
-    const { width, height, pages } = await sharp(image, {
-      limitInputPixels: 384 * 1600,
-    }).metadata();
-    if (
-      pages !== undefined ||
-      width !== Math.round(printableWidthMm * DOTS_PER_MM) ||
-      height !== Math.round(heightMm * DOTS_PER_MM)
-    )
-      return null;
-    // Keep the original fingerprint for a one-copy job already recorded by an older bridge.
-    const fingerprint = (
-      copies === 1
-        ? hash(image)
-        : createHash('sha256')
-            .update('kept-print-copies')
-            .update(String(copies))
-            .update('\0')
-            .update(image)
-            .digest()
-    ).toString('hex');
-    return { id, image, fingerprint, copies };
+    const images = [];
+    for (const raster of pngs ?? [png]) {
+      if (typeof raster !== 'string' || raster.length > MAX_PNG_LENGTH) return null;
+      const image = Buffer.from(raster, 'base64');
+      if (!image.subarray(0, pngMagic.length).equals(pngMagic)) return null;
+      const { width, height, pages } = await sharp(image, {
+        limitInputPixels: 384 * 1600,
+      }).metadata();
+      if (
+        pages !== undefined ||
+        width !== Math.round(printableWidthMm * DOTS_PER_MM) ||
+        height !== Math.round(heightMm * DOTS_PER_MM)
+      )
+        return null;
+      images.push(image);
+    }
+    return { id, images, fingerprint: fingerprint(images, copies), copies };
   } catch {
     return null;
   }
 }
 
-export function makeServer({ token, database, printLabel }) {
+function fingerprint(images, copies) {
+  const [first] = images;
+  // Preserve the fingerprints stored by bridges that only printed one label per job.
+  if (images.length === 1 && copies === 1) return hash(first).toString('hex');
+  const digest = createHash('sha256')
+    .update(images.length === 1 ? 'kept-print-copies' : 'kept-print-batch')
+    .update(String(copies))
+    .update('\0');
+  for (const image of images) digest.update(images.length === 1 ? image : hash(image));
+  return digest.digest('hex');
+}
+
+function jobState({ state, total_labels, printed_labels }) {
+  return total_labels > 1
+    ? { state, totalLabels: total_labels, printedLabels: printed_labels }
+    : { state };
+}
+
+export function makeServer({ token, database, printLabels }) {
   if (!/^[A-Za-z0-9._~-]{12,512}$/.test(token ?? '')) throw new Error('Set BRIDGE_TOKEN');
   const expected = hash(`Bearer ${token}`);
   const db = new DatabaseSync(database);
@@ -90,15 +109,28 @@ export function makeServer({ token, database, printLabel }) {
     UPDATE jobs SET state = 'failed' WHERE state = 'queued';
     UPDATE jobs SET state = 'uncertain' WHERE state = 'printing';
   `);
+  const columns = db
+    .prepare('PRAGMA table_info(jobs)')
+    .all()
+    .map(({ name }) => name);
+  if (!columns.includes('total_labels')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN total_labels INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!columns.includes('printed_labels')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN printed_labels INTEGER NOT NULL DEFAULT 0');
+  }
   const find = db.prepare('SELECT * FROM jobs WHERE id = ?');
   const active = db.prepare("SELECT 1 FROM jobs WHERE state IN ('queued', 'printing')");
-  const insert = db.prepare("INSERT INTO jobs VALUES (?, ?, 'queued')");
+  const insert = db.prepare(
+    "INSERT INTO jobs (id, fingerprint, state, total_labels) VALUES (?, ?, 'queued', ?)",
+  );
   const update = db.prepare('UPDATE jobs SET state = ? WHERE id = ?');
+  const advance = db.prepare('UPDATE jobs SET printed_labels = printed_labels + 1 WHERE id = ?');
 
-  async function run({ id, image, copies }) {
+  async function run({ id, images, copies }) {
     update.run('printing', id);
     try {
-      await printLabel(image, copies);
+      await printLabels(images, copies, () => advance.run(id));
       update.run('done', id);
     } catch (error) {
       update.run(error.uncertain ? 'uncertain' : 'failed', id);
@@ -112,13 +144,13 @@ export function makeServer({ token, database, printLabel }) {
       return;
     }
     if (request.method === 'GET' && request.url === '/api/kept/v1/health') {
-      answer(response, 200, { ok: true, maxCopies: MAX_COPIES });
+      answer(response, 200, { ok: true, maxCopies: MAX_COPIES, maxLabels: MAX_LABELS });
       return;
     }
     if (request.method === 'GET' && request.url?.startsWith(`${path}/`)) {
       const id = request.url.slice(path.length + 1);
       const job = jobId.test(id) ? find.get(id) : undefined;
-      answer(response, job ? 200 : 404, job ? { state: job.state } : { error: 'Not found' });
+      answer(response, job ? 200 : 404, job ? jobState(job) : { error: 'Not found' });
       return;
     }
     if (request.method === 'POST' && request.url === path) {
@@ -130,12 +162,12 @@ export function makeServer({ token, database, printLabel }) {
       const existing = find.get(job.id);
       if (existing) {
         return existing.fingerprint === job.fingerprint
-          ? answer(response, 200, { state: existing.state })
+          ? answer(response, 200, jobState(existing))
           : answer(response, 409, { error: 'Job identifier already in use' });
       }
       if (active.get()) return answer(response, 409, { error: 'Printer is busy' });
-      insert.run(job.id, job.fingerprint);
-      answer(response, 202, { state: 'queued' });
+      insert.run(job.id, job.fingerprint, job.images.length);
+      answer(response, 202, jobState(find.get(job.id)));
       setImmediate(() => void run(job));
       return;
     }
@@ -158,8 +190,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error('PORT must be between 1 and 65535');
   await mkdir('data', { recursive: true, mode: 0o700 });
-  const printLabel = makePrinter({ transport: NIIMBOT_TRANSPORT, address: NIIMBOT_ADDRESS });
-  makeServer({ token: BRIDGE_TOKEN, database: 'data/jobs.sqlite', printLabel }).listen(
+  const printLabels = makePrinter({ transport: NIIMBOT_TRANSPORT, address: NIIMBOT_ADDRESS });
+  makeServer({ token: BRIDGE_TOKEN, database: 'data/jobs.sqlite', printLabels }).listen(
     port,
     LISTEN_HOST,
     () => {

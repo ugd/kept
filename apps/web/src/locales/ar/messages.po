@@ -29452,3 +29452,31 @@ msgstr "عدد النسخ"
 #: src/components/scan/session/session-screen.tsx
 msgid "Counts are off there"
 msgstr "العدّ متوقف هناك"
+
+#: src/components/labels/server-print.tsx
+msgid "{labelCount, plural, one {Print # label} other {Print # labels}}"
+msgstr "{labelCount, plural, zero {طباعة # ملصق} one {طباعة ملصق واحد} two {طباعة ملصقين} few {طباعة # ملصقات} many {طباعة # ملصقًا} other {طباعة # ملصق}}"
+
+#: src/components/labels/server-print.tsx
+msgid "Check the printed labels before printing again."
+msgstr "تحقّق من الملصقات المطبوعة قبل إعادة الطباعة."
+
+#: src/components/labels/server-print.tsx
+msgid "Copies per label"
+msgstr "عدد النسخ لكل ملصق"
+
+#: src/components/labels/server-print.tsx
+msgid "Label to preview"
+msgstr "الملصق المراد معاينته"
+
+#: src/components/labels/server-print.tsx
+msgid "Printed {doneLabels} of {totalLabels} labels."
+msgstr "تمت طباعة {doneLabels} من أصل {totalLabels} ملصقًا."
+
+#: src/components/labels/server-print.tsx
+msgid "Printing stopped before all labels finished."
+msgstr "توقفت الطباعة قبل اكتمال طباعة جميع الملصقات."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished all labels."
+msgstr "انتهت الطابعة من طباعة جميع الملصقات."

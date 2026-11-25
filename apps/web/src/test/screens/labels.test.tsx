@@ -610,7 +610,7 @@ describe('the print view', () => {
     expect(print).not.toHaveBeenCalled();
   });
 
-  it('opens label selection from the toolbar when the batch has several labels', async () => {
+  it('prints every selected label in one job from the toolbar', async () => {
     const state = ownerScenario();
     const saved = batch();
     const first = saved.labels[0];
@@ -624,13 +624,36 @@ describe('the print view', () => {
           formats: [{ id: '50x30', widthMm: 50, heightMm: 30, dotsPerMm: 8 }],
         }));
         mock.on('GET', capturePaths.labelServerPreview(':id'), () => ({ png: 'aGVsbG8=' }));
+        mock.on('POST', capturePaths.labelServerJobs(':id'), () =>
+          reply(202, { state: 'queued', totalLabels: 2, printedLabels: 0 }),
+        );
+        mock.on('GET', capturePaths.labelServerJob(':id', ':requestId'), () =>
+          reply(200, { state: 'done', totalLabels: 2, printedLabels: 2 }),
+        );
       },
     });
     await user.click(await screen.findByRole('button', { name: 'Print on server' }));
     const dialog = await screen.findByRole('dialog', { name: 'Print on server' });
-    expect(within(dialog).getByRole('combobox', { name: 'Label' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('textbox', { name: 'Copies' })).toHaveValue('1');
-    expect(mock.lastCall('POST', capturePaths.labelServerJobs(saved.id))).toBeUndefined();
+    expect(within(dialog).queryByRole('combobox', { name: /label/i })).toBeNull();
+    const copies = within(dialog).getByRole('textbox', { name: 'Copies per label' });
+    expect(copies).toHaveValue('1');
+    expect(copies).toHaveFocus();
+    await user.clear(copies);
+    await user.type(copies, '2');
+    const jobs = capturePaths.labelServerJobs(saved.id);
+    expect(mock.lastCall('POST', jobs)).toBeUndefined();
+    expect(within(dialog).getByRole('button', { name: 'Print 2 labels' })).toBeEnabled();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Printed 2 of 2 labels.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Yes, printed OK' })).toBeInTheDocument();
+    const submits = mock.calls.filter(({ method, path }) => method === 'POST' && path === jobs);
+    expect(submits).toHaveLength(1);
+    expect(submits[0]?.body).toEqual({
+      all: true,
+      formatId: '50x30',
+      copies: 2,
+      requestId: expect.any(String),
+    });
   });
 
   it('keeps an Arabic name in its own direction and the code left to right, in Arabic', async () => {

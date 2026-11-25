@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 
 export function makePrinter({ transport, address }) {
-  return async function printLabel(png, copies) {
+  return async function printLabels(images, copies, onLabelPrinted) {
     const {
       default: { initClient, printImages },
     } = await import('@mmote/niimblue-node/dist/utils.js');
@@ -25,17 +25,24 @@ export function makePrinter({ transport, address }) {
       if (!paperInserted || !lidClosed || !paperRfidSuccess) {
         throw new Error('Printer needs paper, a closed lid and an accepted RFID tag');
       }
-      const encoded = await ImageEncoder.encodeImage(sharp(png), PageColorType.SingleColor, 'top');
-      try {
-        await printImages(client, 'B1', [{ encoded }], {
-          quantity: copies,
-          density: 3,
-          labelType: LabelType.WithGaps,
-        });
-      } catch (cause) {
-        const error = new Error('Physical print result is uncertain', { cause });
-        error.uncertain = true;
-        throw error;
+      for (const png of images) {
+        const encoded = await ImageEncoder.encodeImage(
+          sharp(png),
+          PageColorType.SingleColor,
+          'top',
+        );
+        try {
+          await printImages(client, 'B1', [{ encoded }], {
+            quantity: copies,
+            density: 3,
+            labelType: LabelType.WithGaps,
+          });
+          onLabelPrinted();
+        } catch (cause) {
+          const error = new Error('Physical print result is uncertain', { cause });
+          error.uncertain = true;
+          throw error;
+        }
       }
     } finally {
       await client.disconnect().catch(() => {});

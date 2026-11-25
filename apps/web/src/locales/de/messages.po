@@ -29452,3 +29452,31 @@ msgstr "Kopien"
 #: src/components/scan/session/session-screen.tsx
 msgid "Counts are off there"
 msgstr "Zählungen sind dort aus"
+
+#: src/components/labels/server-print.tsx
+msgid "{labelCount, plural, one {Print # label} other {Print # labels}}"
+msgstr "{labelCount, plural, one {# Etikett drucken} other {# Etiketten drucken}}"
+
+#: src/components/labels/server-print.tsx
+msgid "Check the printed labels before printing again."
+msgstr "Prüfe die gedruckten Etiketten, bevor du erneut druckst."
+
+#: src/components/labels/server-print.tsx
+msgid "Copies per label"
+msgstr "Kopien je Etikett"
+
+#: src/components/labels/server-print.tsx
+msgid "Label to preview"
+msgstr "Etikett für die Vorschau"
+
+#: src/components/labels/server-print.tsx
+msgid "Printed {doneLabels} of {totalLabels} labels."
+msgstr "{doneLabels} von {totalLabels} Etiketten gedruckt."
+
+#: src/components/labels/server-print.tsx
+msgid "Printing stopped before all labels finished."
+msgstr "Der Druck wurde angehalten, bevor alle Etiketten fertig waren."
+
+#: src/components/labels/server-print.tsx
+msgid "The printer finished all labels."
+msgstr "Der Drucker hat alle Etiketten gedruckt."

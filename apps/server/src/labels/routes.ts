@@ -8,7 +8,7 @@ import type { Pools } from '../db/pools.js';
 import { type Scope, type Tx, withScope } from '../db/scope.js';
 import type { KeptApp } from '../http/app.js';
 import { paginate, paginationQuery } from '../http/conventions.js';
-import { AppError, notFound } from '../http/errors.js';
+import { AppError, invalid, notFound } from '../http/errors.js';
 import { locationModuleSet } from '../http/modules.js';
 import type { InventoryDeps } from '../http/routes.js';
 import { scopedRead, scopedWrite } from '../http/write.js';
@@ -66,6 +66,14 @@ import {
 const Id = z.uuid();
 const CodeParam = z.object({ code: z.string().min(1).max(32) });
 const PrintChoice = z.strictObject({ code: z.string().regex(SHORT_CODE), formatId: FormatId });
+const PrintJobOptions = {
+  requestId: Id,
+  copies: z.number().int().min(1).max(MAX_LABEL_PRINT_COPIES).default(1),
+};
+const PrintJob = z.union([
+  PrintChoice.extend(PrintJobOptions),
+  z.strictObject({ all: z.literal(true), formatId: FormatId, ...PrintJobOptions }),
+]);
 
 const ClaimResultSchema = z.object({
   outcome: z.literal('claimed'),
@@ -295,10 +303,7 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
       config: printModule,
       schema: {
         params: z.object({ id: Id }),
-        body: PrintChoice.extend({
-          requestId: Id,
-          copies: z.number().int().min(1).max(MAX_LABEL_PRINT_COPIES).default(1),
-        }),
+        body: PrintJob,
         response: { 202: PrintServerState },
       },
     },
@@ -306,22 +311,32 @@ export async function labelRoutes(app: KeptApp, deps: InventoryDeps): Promise<vo
       scopedWrite(pools, req, reply, async (tx, client, scope) => {
         const batch = await printableBatch(client, req.params.id);
         const { printer, formats } = await printerFor(batch.locationId);
-        const { label, format } = printableLabel(batch, formats, req.body);
+        const choice = req.body;
+        const format = formats.find(({ id }) => id === choice.formatId);
+        const label =
+          'code' in choice ? batch.labels.find(({ code }) => code === choice.code) : null;
+        const labels = 'all' in choice ? batch.labels : label ? [label] : [];
+        if (!format || !labels.length) throw notFound();
         const jobId = printJobId(scope.userId, batch.id, req.body.requestId.toLowerCase());
         // Replays after an uncertain network response use the same physical job identifier.
         const { copies } = req.body;
-        const body = await printer.submit(
-          jobId,
-          format,
-          await renderPrintLabel(label, format),
-          copies,
-        );
+        const images: Buffer[] = [];
+        for (const label of labels) {
+          try {
+            images.push(await renderPrintLabel(label, format));
+          } catch (error) {
+            if (labels.length > 1 && error instanceof AppError && error.code === 'validation')
+              throw invalid(`${label.name ?? label.code}: ${error.message}`);
+            throw error;
+          }
+        }
+        const body = await printer.submit(jobId, format, images, copies);
         await audited(tx, {
           locationId: batch.locationId,
           actor: actorOf(scope),
           action: 'labels.print_server',
           entity: { type: 'label_batch', id: batch.id },
-          after: { format: format.id, copies },
+          after: { format: format.id, copies, labels: labels.length },
           requestId: req.id,
         });
         return { status: 202, body };
