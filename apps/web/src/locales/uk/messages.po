@@ -31431,3 +31431,7 @@ msgstr "Друк із браузера"
 #: src/components/labels/server-print.tsx
 msgid "Copies"
 msgstr "Копії"
+
+#: src/components/scan/session/session-screen.tsx
+msgid "Counts are off there"
+msgstr "Підрахунки там вимкнено"

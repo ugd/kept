@@ -29448,3 +29448,7 @@ msgstr "Imprimer depuis le navigateur"
 #: src/components/labels/server-print.tsx
 msgid "Copies"
 msgstr "Exemplaires"
+
+#: src/components/scan/session/session-screen.tsx
+msgid "Counts are off there"
+msgstr "Les comptages sont désactivés là-bas"

@@ -29448,3 +29448,7 @@ msgstr "Im Browser drucken"
 #: src/components/labels/server-print.tsx
 msgid "Copies"
 msgstr "Kopien"
+
+#: src/components/scan/session/session-screen.tsx
+msgid "Counts are off there"
+msgstr "Zählungen sind dort aus"

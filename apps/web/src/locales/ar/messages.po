@@ -29448,3 +29448,7 @@ msgstr "الطباعة من المتصفح"
 #: src/components/labels/server-print.tsx
 msgid "Copies"
 msgstr "عدد النسخ"
+
+#: src/components/scan/session/session-screen.tsx
+msgid "Counts are off there"
+msgstr "العدّ متوقف هناك"

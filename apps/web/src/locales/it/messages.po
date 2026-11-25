@@ -29448,3 +29448,7 @@ msgstr "Stampa dal browser"
 #: src/components/labels/server-print.tsx
 msgid "Copies"
 msgstr "Copie"
+
+#: src/components/scan/session/session-screen.tsx
+msgid "Counts are off there"
+msgstr "I conteggi sono disattivati lì"
