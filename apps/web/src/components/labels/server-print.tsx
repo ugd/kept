@@ -1,7 +1,7 @@
 import { type LabelStock, MAX_LABEL_PRINT_COPIES, newId, printedCode } from '@kept/shared';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { capturePaths } from '@/api/capture/paths';
 import type { LabelBatch, LabelPrintFormat } from '@/api/capture/types';
 import { api, isApiError } from '@/api/client';
@@ -19,7 +19,6 @@ import { useConfirmPrinted } from './printed-ok';
 type Job = { state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain' };
 type Choice = { code: string; formatId: string };
 type PrintRequest = Choice & { requestId: string; copies: number };
-type CopyPrompt = { value: string; choices: boolean };
 
 function validCopies(copies: unknown): copies is number {
   return (
@@ -119,22 +118,21 @@ export function ServerPrint({
   const [selectedCode, setCode] = useState(restored?.code);
   const [selectedFormat, setFormat] = useState(restored?.formatId);
   const [request, setRequest] = useState(restored);
-  const [prompt, setPrompt] = useState<CopyPrompt | null>(() =>
-    initiallyOpen ? { value: '1', choices: true } : null,
-  );
+  const [prompt, setPrompt] = useState<string | null>(initiallyOpen ? '1' : null);
+  const promptOpen = prompt !== null;
+  const rollInput = useRef<HTMLInputElement>(null);
+  const copiesInput = useRef<HTMLInputElement>(null);
   const code =
     batch.labels.find((label) => label.code === selectedCode)?.code ?? batch.labels[0]?.code;
   const matchingFormats = formats.filter(
     ({ widthMm, heightMm }) => widthMm === stock.cell.w && heightMm === stock.cell.h,
   );
   const chosenFormat =
-    browserMode && !prompt ? undefined : formats.find(({ id }) => id === selectedFormat);
+    browserMode && !promptOpen ? undefined : formats.find(({ id }) => id === selectedFormat);
   const format = chosenFormat ?? matchingFormats[0] ?? formats[0];
-  const direct =
-    batch.labels.length === 1 && (matchingFormats.length === 1 || formats.length === 1);
   const preview = useQuery({
     queryKey: ['labels', 'print-server', batch.id, code, format],
-    enabled: !!(code && format) && (!browserMode || !!prompt),
+    enabled: !!(code && format) && (!browserMode || promptOpen),
     queryFn: ({ signal }) =>
       api.get<{ png: string }>(
         capturePaths.labelServerPreview(batch.id) + qs({ code, formatId: format?.id }),
@@ -196,7 +194,7 @@ export function ServerPrint({
       print(request.copies);
       if (browserMode) showServer();
     } else {
-      setPrompt({ value: '1', choices: browserMode && !direct });
+      setPrompt('1');
     }
   };
   const action = (
@@ -209,6 +207,10 @@ export function ServerPrint({
       {retry ? <Trans>Retry print request</Trans> : <Trans>Print on server</Trans>}
     </Button>
   );
+  const labelOptions = batch.labels.map((label) => ({
+    id: label.code,
+    label: label.name ?? printedCode(label.code),
+  }));
   const pickLabel = batch.labels.length > 1;
   const pickFormat = formats.length > 1;
   const rollName = ({ widthMm, heightMm }: LabelPrintFormat) => {
@@ -218,20 +220,24 @@ export function ServerPrint({
   };
   const canConfirm =
     result?.state === 'done' && batch.labels.length === 1 && !batch.printedConfirmedAt;
-  const copies = parseNumber(prompt?.value ?? '');
+  const copies = parseNumber(prompt ?? '');
+  // The job route validates and renders the selected format even if its preview is still loading.
+  const canPrint = validCopies(copies) && !preview.isError && !blocked;
 
-  const choices = (
+  const choices = (inDialog: boolean) => (
     <div className={pickLabel && pickFormat ? 'grid gap-3 sm:grid-cols-2' : 'grid gap-3'}>
       {pickLabel ? (
         <Combobox
           label={t`Label`}
-          items={batch.labels.map((label) => ({
-            id: label.code,
-            label: label.name ?? printedCode(label.code),
-          }))}
+          items={labelOptions}
           selectedKey={code}
+          defaultInputValue={labelOptions.find((label) => label.id === code)?.label}
           isDisabled={blocked}
           showsChoice
+          autoFocus={inDialog}
+          onConfirmChoice={
+            inDialog ? () => (pickFormat ? rollInput : copiesInput).current?.focus() : undefined
+          }
           onSelectionChange={(key) => {
             if (key !== null) setCode(String(key));
           }}
@@ -242,8 +248,12 @@ export function ServerPrint({
           label={t`Roll format`}
           items={formats.map((item) => ({ id: item.id, label: rollName(item) }))}
           selectedKey={format.id}
+          defaultInputValue={rollName(format)}
           isDisabled={blocked}
           showsChoice
+          autoFocus={inDialog && !pickLabel}
+          inputProps={inDialog ? { ref: rollInput } : undefined}
+          onConfirmChoice={inDialog ? () => copiesInput.current?.focus() : undefined}
           onSelectionChange={(key) => {
             if (key !== null) setFormat(String(key));
           }}
@@ -259,7 +269,7 @@ export function ServerPrint({
       className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 print:hidden sm:py-8"
       aria-label={t`Print server`}
     >
-      {choices}
+      {choices(false)}
       {preview.isPending ? <LoadingRows rows={2} /> : null}
       {preview.data ? <Preview png={preview.data.png} /> : null}
       {preview.isError ? <Notice tone="danger">{describeError(preview.error)}</Notice> : null}
@@ -298,7 +308,7 @@ export function ServerPrint({
     <>
       {children(action, details)}
       <Modal
-        isOpen={!!prompt}
+        isOpen={promptOpen}
         onOpenChange={(open) => !open && setPrompt(null)}
         className="print:hidden"
         overlayClassName="print:hidden"
@@ -306,31 +316,38 @@ export function ServerPrint({
         <Dialog title={<Trans>Print on server</Trans>} showClose={false}>
           <form
             className="grid gap-4"
+            onKeyDownCapture={(event) => {
+              if (event.key === 'Enter' && event.repeat) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
             onSubmit={(event) => {
               event.preventDefault();
-              if (!prompt || !validCopies(copies) || !preview.data || blocked) return;
+              if (!promptOpen || !canPrint) return;
               setPrompt(null);
               print(copies);
               if (browserMode) showServer();
             }}
           >
-            {prompt?.choices ? choices : null}
+            {choices(true)}
             <TextField
-              autoFocus
+              autoFocus={!pickLabel && !pickFormat}
+              inputProps={{ ref: copiesInput }}
               label={t`Copies`}
               errorMessage={`${fmt.num(1)}–${fmt.num(MAX_LABEL_PRINT_COPIES)}`}
               inputMode="numeric"
               isRequired
-              isInvalid={!!prompt?.value && !validCopies(copies)}
-              value={prompt?.value ?? ''}
-              onChange={(value) => setPrompt((current) => current && { ...current, value })}
+              isInvalid={!!prompt && !validCopies(copies)}
+              value={prompt ?? ''}
+              onChange={(value) => setPrompt(value)}
             />
             {preview.isError ? <Notice tone="danger">{describeError(preview.error)}</Notice> : null}
             <DialogFooter>
               <Button variant="secondary" onPress={() => setPrompt(null)}>
                 <Trans>Cancel</Trans>
               </Button>
-              <Button type="submit" isDisabled={!validCopies(copies) || !preview.data || blocked}>
+              <Button type="submit" isDisabled={!canPrint}>
                 <Trans>Print</Trans>
               </Button>
             </DialogFooter>

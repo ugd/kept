@@ -73,8 +73,12 @@ describe('the labels screen', () => {
 });
 
 describe('the batch builder', () => {
-  it('chooses a server roll and submits a label without opening the browser print dialog', async () => {
+  it.each([
+    { formatId: '12x30', keys: '{Enter}' },
+    { formatId: '50x30', keys: '50{Enter}' },
+  ])('confirms $formatId with Enter, then prints with Enter', async ({ formatId, keys }) => {
     const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const submit = vi.fn(() => reply(202, { state: 'done' }));
     const { user, mock, router } = await renderApp(
       `/labels?loc=${IDS.home}&things=${T.hdmiCable}`,
       {
@@ -90,28 +94,28 @@ describe('the batch builder', () => {
           mock.on('GET', capturePaths.labelServerPreview(':id'), () =>
             reply(200, { png: 'aGVsbG8=' }),
           );
-          mock.on('POST', capturePaths.labelServerJobs(':id'), () => reply(202, { state: 'done' }));
+          mock.on('POST', capturePaths.labelServerJobs(':id'), submit);
         },
       },
     );
     await user.click(await screen.findByRole('button', { name: 'Print on server' }));
     const dialog = await screen.findByRole('dialog', { name: 'Print on server' });
-    expect(within(dialog).getByRole('textbox', { name: 'Copies' })).toHaveValue('1');
+    const copies = within(dialog).getByRole('textbox', { name: 'Copies' });
+    expect(copies).toHaveValue('1');
     expect(within(dialog).queryByRole('combobox', { name: 'Label' })).toBeNull();
     const picker = within(dialog).getByRole('combobox', { name: 'Roll format' });
-    await user.click(picker);
-    await user.keyboard('{ArrowDown}');
-    await user.click(await screen.findByRole('option', { name: '50 × 30 mm' }));
-    const send = within(dialog).getByRole('button', { name: 'Print' });
+    expect(picker).toHaveFocus();
+    await user.keyboard(keys);
     const batchId = pathOf(router).split('/').at(-1) ?? '';
-    expect(mock.lastCall('POST', capturePaths.labelServerJobs(batchId))).toBeUndefined();
-    await waitFor(() => expect(send).toBeEnabled());
-    await user.click(send);
+    await waitFor(() => expect(copies).toHaveFocus());
+    expect(submit).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
     expect(await screen.findByText('The printer finished this label.')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Yes, printed OK' })).toBeInTheDocument();
+    expect(submit).toHaveBeenCalledTimes(1);
     expect(mock.lastCall('POST', capturePaths.labelServerJobs(batchId))?.body).toMatchObject({
       code: '7KQ4MZ',
-      formatId: '50x30',
+      formatId,
       copies: 1,
     });
     const section = await screen.findByRole('region', { name: 'Print server' });
@@ -579,7 +583,13 @@ describe('the print view', () => {
     await user.click(send);
     const dialog = await screen.findByRole('dialog', { name: 'Print on server' });
     const copies = within(dialog).getByRole('textbox', { name: 'Copies' });
+    const roll = within(dialog).getByRole('combobox', { name: 'Roll format' });
     const confirm = within(dialog).getByRole('button', { name: 'Print' });
+    expect(roll).toHaveFocus();
+    expect(roll).toHaveValue('40 × 40 mm');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(copies).toHaveFocus());
+    expect(mock.lastCall('POST', jobs)).toBeUndefined();
     await user.clear(copies);
     await user.type(copies, '0');
     expect(confirm).toBeDisabled();
@@ -587,7 +597,7 @@ describe('the print view', () => {
     await user.type(copies, '3');
     expect(mock.lastCall('POST', jobs)).toBeUndefined();
     await waitFor(() => expect(confirm).toBeEnabled());
-    await user.click(confirm);
+    await user.keyboard('{Enter}');
     await screen.findByRole('region', { name: 'Print server' });
     expect(await screen.findByText('The printer finished this label.')).toBeInTheDocument();
     const submission = mock.lastCall('POST', jobs);

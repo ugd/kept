@@ -9,7 +9,7 @@
  *             selectedKey={code} onSelectionChange={setCode} />
  */
 import { useLingui } from '@lingui/react/macro';
-import { type ReactNode, useContext, useEffect, useRef } from 'react';
+import { type ReactNode, type Ref, useContext, useEffect, useRef } from 'react';
 import {
   Button as ButtonPrimitive,
   ComboBox as ComboBoxPrimitive,
@@ -56,7 +56,9 @@ export type ComboboxProps<T extends ComboboxOption, M extends SelectionMode = 's
      * replaces it, and a click opens the whole list, as a picker does.
      */
     showsChoice?: boolean;
-    inputProps?: { lang?: string; className?: string | undefined };
+    /** For a `showsChoice` picker, advance after Enter confirms a choice. */
+    onConfirmChoice?: () => void;
+    inputProps?: { lang?: string; className?: string | undefined; ref?: Ref<HTMLInputElement> };
     /** What a `selectionMode="multiple"` box has chosen, shown below it; describes the box. */
     renderValue?: (selected: T[]) => ReactNode;
   };
@@ -67,7 +69,10 @@ const KEYBOARD_SETTLES_MS = 700;
 const CLOSED_BY_SCROLL_MS = 100;
 
 /** The box of a `showsChoice` Combobox. Enter chooses the first match for what was typed. */
-function ChoiceInput(props: InputProps) {
+function ChoiceInput({
+  onConfirmChoice,
+  ...props
+}: InputProps & { ref?: Ref<HTMLInputElement>; onConfirmChoice?: () => void }) {
   const state = useContext(ComboBoxStateContext);
   const focused = useRef<{ input: HTMLInputElement; at: number } | null>(null);
   const scrolledAt = useRef(Number.NEGATIVE_INFINITY);
@@ -111,12 +116,19 @@ function ChoiceInput(props: InputProps) {
       onKeyDownCapture={(e) => {
         // Before React Aria reads Enter: with nothing highlighted it would only close the list and
         // put the old text back. The whole list, opened by a click, has nothing typed to match.
-        if (e.key !== 'Enter' || !state?.isOpen || state.selectionManager.focusedKey != null)
-          return;
+        if (e.key !== 'Enter' || e.nativeEvent.isComposing || !state) return;
         const typed = state.inputValue.trim();
-        if (typed === '' || typed === state.selectedItem?.textValue) return;
-        const first = state.collection.getFirstKey();
-        if (first != null) state.selectionManager.setFocusedKey(first);
+        const hasChoice = state.selectedItem != null && typed === state.selectedItem.textValue;
+        let key = state.isOpen ? state.selectionManager.focusedKey : null;
+        if (state.isOpen && key == null && typed !== '' && !hasChoice) {
+          key = state.collection.getFirstKey();
+          if (key != null) state.selectionManager.setFocusedKey(key);
+        }
+        if (onConfirmChoice) {
+          e.preventDefault();
+          // React Aria commits the highlighted option during the rest of this key event.
+          if (key != null || hasChoice) requestAnimationFrame(onConfirmChoice);
+        }
       }}
       onClick={(e) => {
         if (!state || state.isOpen) return;
@@ -138,6 +150,7 @@ export function Combobox<T extends ComboboxOption, M extends SelectionMode = 'si
   children,
   leading,
   showsChoice = false,
+  onConfirmChoice,
   inputProps,
   renderValue,
   className,
@@ -163,6 +176,7 @@ export function Combobox<T extends ComboboxOption, M extends SelectionMode = 'si
         ) : null}
         <BoxInput
           {...inputProps}
+          {...(showsChoice ? { onConfirmChoice } : {})}
           className={cn(inputClass, 'pe-11', leading && 'ps-[41px]', inputProps?.className)}
           placeholder={placeholder}
         />

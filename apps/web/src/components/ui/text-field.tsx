@@ -2,9 +2,9 @@
  * TextField: label, input, optional description and error, wired by React Aria (label/for,
  * aria-describedby, aria-invalid). Controlled with `value` + `onChange(value)`.
  */
+import type { ComponentPropsWithRef } from 'react';
 import {
   Input,
-  type InputProps,
   TextField as TextFieldPrimitive,
   type TextFieldProps as TextFieldPrimitiveProps,
 } from 'react-aria-components';
@@ -14,7 +14,7 @@ import { Description, type FieldChrome, FieldError, inputClass, Label } from './
 export type TextFieldProps = Omit<TextFieldPrimitiveProps, 'children'> &
   FieldChrome & {
     placeholder?: string;
-    inputProps?: Omit<InputProps, 'className'>;
+    inputProps?: Omit<ComponentPropsWithRef<typeof Input>, 'className'>;
   };
 
 export function TextField({
