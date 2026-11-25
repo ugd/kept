@@ -1,13 +1,14 @@
-import { type LabelStock, MAX_LABEL_PRINT_COPIES, newId, printedCode } from '@kept/shared';
+import { can, type LabelStock, MAX_LABEL_PRINT_COPIES, newId, printedCode } from '@kept/shared';
 import { plural } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { capturePaths } from '@/api/capture/paths';
 import type { LabelBatch, LabelPrintFormat } from '@/api/capture/types';
 import { api, isApiError } from '@/api/client';
 import { qs } from '@/api/inventory/paths';
-import { PrinterIcon } from '@/components/icons';
+import { useLocation } from '@/api/queries';
+import { PlusIcon, PrinterIcon } from '@/components/icons';
 import { LoadingRows, Notice, useErrorText } from '@/components/page';
 import { parseNumber } from '@/components/things/form-model';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,12 @@ import { Dialog, DialogFooter, Modal } from '@/components/ui/dialog';
 import { TextField } from '@/components/ui/text-field';
 import { useFormat } from '@/lib/format';
 import { useConfirmPrinted } from './printed-ok';
+
+const CreateThingSheet = lazy(() =>
+  import('@/components/things/create-sheet').then((module) => ({
+    default: module.CreateThingSheet,
+  })),
+);
 
 type Job = {
   state: 'queued' | 'printing' | 'done' | 'failed' | 'uncertain';
@@ -64,6 +71,25 @@ function Preview({ png }: { png: string }) {
   return source ? (
     <img src={source} alt={t`Label preview`} className="mx-auto max-h-48 max-w-full bg-white" />
   ) : null;
+}
+
+function AddNextThing({ locationId }: { locationId: string }) {
+  const location = useLocation(locationId);
+  const [adding, setAdding] = useState(false);
+  if (!location.data || !can(location.data.role, 'things.edit')) return null;
+  return (
+    <>
+      <Button variant="secondary" size="small" onPress={() => setAdding(true)}>
+        <PlusIcon className="size-4" />
+        <Trans>Add a thing</Trans>
+      </Button>
+      {adding ? (
+        <Suspense fallback={null}>
+          <CreateThingSheet isOpen locationId={locationId} onClose={() => setAdding(false)} />
+        </Suspense>
+      ) : null}
+    </>
+  );
 }
 
 const active = (job?: Job) => job?.state === 'queued' || job?.state === 'printing';
@@ -223,8 +249,9 @@ export function ServerPrint({
     return t`${width} × ${height} mm`;
   };
   const batchJob = request?.all === true;
-  const canConfirm =
-    result?.state === 'done' && (!multiple || batchJob) && !batch.printedConfirmedAt;
+  const finished = result?.state === 'done' && (!multiple || batchJob);
+  const canConfirm = finished && !batch.printedConfirmedAt;
+  const canAdd = !blocked && (finished || batch.printedConfirmedAt);
   const doneLabels = result?.printedLabels;
   const totalLabels = result?.totalLabels;
   const copies = parseNumber(prompt ?? '');
@@ -313,15 +340,20 @@ export function ServerPrint({
             )
           ) : null}
         </div>
-        {canConfirm ? (
-          <Button
-            variant="secondary"
-            size="small"
-            isPending={confirmPrinted.isPending}
-            onPress={() => confirmPrinted.mutate()}
-          >
-            <Trans>Yes, printed OK</Trans>
-          </Button>
+        {canConfirm || canAdd ? (
+          <div className="flex flex-wrap justify-center gap-2">
+            {canConfirm ? (
+              <Button
+                variant="secondary"
+                size="small"
+                isPending={confirmPrinted.isPending}
+                onPress={() => confirmPrinted.mutate()}
+              >
+                <Trans>Yes, printed OK</Trans>
+              </Button>
+            ) : null}
+            {canAdd ? <AddNextThing locationId={batch.locationId} /> : null}
+          </div>
         ) : null}
       </div>
     </section>

@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { capturePaths } from '@/api/capture/paths';
 import type { LabelBatch } from '@/api/capture/types';
 import { INV_IDS } from '@/api/inventory/mock/fixtures';
+import { inventoryPaths as p } from '@/api/inventory/paths';
 import { IDS, ownerScenario } from '@/api/mock/fixtures';
 import { reply } from '@/api/mock/kit';
 import { FSI, PDI } from '@/lib/bidi';
@@ -610,7 +611,7 @@ describe('the print view', () => {
     expect(print).not.toHaveBeenCalled();
   });
 
-  it('prints every selected label in one job from the toolbar', async () => {
+  it('prints every selected label in one job and offers to add the next thing', async () => {
     const state = ownerScenario();
     const saved = batch();
     const first = saved.labels[0];
@@ -632,6 +633,7 @@ describe('the print view', () => {
         );
       },
     });
+    expect(screen.queryByRole('button', { name: 'Add a thing' })).toBeNull();
     await user.click(await screen.findByRole('button', { name: 'Print on server' }));
     const dialog = await screen.findByRole('dialog', { name: 'Print on server' });
     expect(within(dialog).queryByRole('combobox', { name: /label/i })).toBeNull();
@@ -645,7 +647,7 @@ describe('the print view', () => {
     expect(within(dialog).getByRole('button', { name: 'Print 2 labels' })).toBeEnabled();
     await user.keyboard('{Enter}');
     expect(await screen.findByText('Printed 2 of 2 labels.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Yes, printed OK' })).toBeInTheDocument();
+    const confirm = screen.getByRole('button', { name: 'Yes, printed OK' });
     const submits = mock.calls.filter(({ method, path }) => method === 'POST' && path === jobs);
     expect(submits).toHaveLength(1);
     expect(submits[0]?.body).toEqual({
@@ -654,6 +656,26 @@ describe('the print view', () => {
       copies: 2,
       requestId: expect.any(String),
     });
+    await screen.findByRole('button', { name: 'Add a thing' });
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Yes, printed OK' })).toBeNull(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add a thing' }));
+    const form = within(await screen.findByRole('dialog', { name: 'Add a thing' }));
+    await user.type(form.getByRole('textbox', { name: 'Name' }), 'Next box');
+    const place = form.getByRole('combobox', { name: 'Where it is' });
+    await waitFor(() => expect(place).toBeEnabled());
+    await user.type(place, 'Unplaced');
+    await user.click(await screen.findByRole('option', { name: 'Unplaced' }));
+    await user.click(form.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(mock.lastCall('POST', p.things)?.body).toMatchObject({
+        name: 'Next box',
+        locationId: saved.locationId,
+        placeId: INV_IDS.place.familyUnplaced,
+      }),
+    );
   });
 
   it('keeps an Arabic name in its own direction and the code left to right, in Arabic', async () => {
