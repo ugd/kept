@@ -67,6 +67,7 @@ type Errors = Partial<
 export function CreateThingSheet({
   isOpen,
   onClose,
+  onCreated,
   locationId,
   target,
   openAfter = true,
@@ -75,6 +76,7 @@ export function CreateThingSheet({
 }: {
   isOpen: boolean;
   onClose: () => void;
+  onCreated?: (thing: { id: string; locationId: string }) => void;
   locationId: string;
   /** Where it goes; empty ⇒ pick it in the sheet. */
   target?: MoveTarget;
@@ -180,6 +182,13 @@ export function CreateThingSheet({
     setTemplate(null);
   };
 
+  const finish = async (thing: { id: string; locationId: string }) => {
+    reset();
+    onClose();
+    onCreated?.(thing);
+    if (openAfter) await navigate({ to: '/t/$id', params: { id: thing.id } });
+  };
+
   const save = async () => {
     const e: Errors = {};
     if (!name.trim()) e.name = t`Give it a name.`;
@@ -261,9 +270,7 @@ export function CreateThingSheet({
         });
         return;
       }
-      reset();
-      onClose();
-      if (openAfter) await navigate({ to: '/t/$id', params: { id: created.id } });
+      await finish({ id: created.id, locationId: created.locationId });
     } catch (err) {
       toast({ title: t`Couldn't add it`, description: errorText(err), tone: 'danger' });
     } finally {
@@ -272,11 +279,9 @@ export function CreateThingSheet({
   };
 
   const finishFirst = async () => {
-    const id = first?.id;
+    if (!first) return;
     setFirst(null);
-    reset();
-    onClose();
-    if (id && openAfter) await navigate({ to: '/t/$id', params: { id } });
+    await finish({ id: first.id, locationId: first.locationId });
   };
 
   if (first) {

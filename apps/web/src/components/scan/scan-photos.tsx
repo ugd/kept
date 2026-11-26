@@ -1,4 +1,5 @@
 import { can, newId, parseScan } from '@kept/shared';
+import { plural } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -8,24 +9,46 @@ import { keys } from '@/api/queries';
 import { grabFrame } from '@/camera/grab';
 import { appDetect } from '@/camera/scanner';
 import { FilePick } from '@/components/capture/gallery-import';
-import { CameraIcon, GalleryIcon } from '@/components/icons';
+import { CameraIcon, GalleryIcon, QrIcon } from '@/components/icons';
 import { IdChip } from '@/components/id-chip';
 import { Notice, useErrorText } from '@/components/page';
 import { Sheet } from '@/components/places/sheet';
+import { CreateThingSheet } from '@/components/things/create-sheet';
 import { uploadAndAttach, useUploadErrorText } from '@/components/things/upload';
 import { Button, buttonClass } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm';
 import { useOnline } from '@/lib/online';
 import { cn } from '@/lib/utils';
 import { useHoldUpdates } from '@/pwa/register';
+import { ClaimSheet } from './claim-sheet';
 import { type Described, describeTarget } from './describe';
+import { LegacyPicker } from './legacy-picker';
 import { ManualCode } from './manual-code';
-import { type Read, resolveScan } from './resolve';
+import { PhotoTargetPicker } from './photo-target-picker';
+import {
+  type Read,
+  type Resolution,
+  resolveScan,
+  type ScanStore,
+  type ScanTarget,
+} from './resolve';
 import { ScannerView } from './scanner-view';
 
 type Shot = { file: File; fileId: string; attachmentId: string };
+type Choice =
+  | Extract<Resolution, { outcome: 'claim' | 'legacy_ambiguous' }>
+  | { outcome: 'pick' }
+  | { outcome: 'create'; locationId: string; box: boolean };
 
-export function ScanPhotos({ onExit }: { onExit: () => void }) {
+export function ScanPhotos({
+  store,
+  onQueued,
+  onExit,
+}: {
+  store: ScanStore | null;
+  onQueued: () => void;
+  onExit: () => void;
+}) {
   const { t } = useLingui();
   const qc = useQueryClient();
   const online = useOnline();
@@ -41,10 +64,13 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
   const [step, setStep] = useState<'lookup' | 'save' | null>(null);
   const [frameReady, setFrameReady] = useState(false);
   const [manual, setManual] = useState(false);
-  const [shot, setShot] = useState<Shot | null>(null);
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const [unmatched, setUnmatched] = useState<{ code: string | null } | null>(null);
+  const [pending, setPending] = useState<Shot[]>([]);
+  const shot = pending[0];
   const [preview, setPreview] = useState<string>();
   const [error, setError] = useState<string>();
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(0);
   useHoldUpdates(true);
 
   useEffect(() => {
@@ -60,49 +86,21 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
   const select = (value: Described | null) => {
     selected.current = value;
     setTarget(value);
+    setSaved(0);
   };
 
-  const find = async (read: Read, typed = false) => {
-    if (working.current || selected.current || (!typed && (manual || read.format !== 'qr_code')))
-      return;
-    const scan = parseScan(read.text, read.format);
-    const key = scan.kind === 'kept' ? scan.code : read.text;
-    if (!typed && key === lastRead.current) return;
-    setManual(false);
+  const lookUp = async (action: () => Promise<void>) => {
+    if (working.current) return;
     if (!online) {
       setError(t`Needs a connection`);
       return;
     }
-    lastRead.current = key;
     working.current = true;
     setStep('lookup');
-    setSaved(false);
     setError(undefined);
+    setUnmatched(null);
     try {
-      // Resolve against the server so the photo follows the label’s current record.
-      const resolution = await resolveScan(read, { store: null, online });
-      if (resolution.outcome !== 'open') {
-        setError(
-          resolution.outcome === 'not_on_phone'
-            ? t`Needs a connection`
-            : t`Scan a label already assigned to a thing or place.`,
-        );
-        return;
-      }
-      const record = await describeTarget(resolution.target, { store: null, online });
-      if (!record) {
-        setError(t`Couldn't load this`);
-        return;
-      }
-      const location = await qc.fetchQuery({
-        queryKey: keys.location(record.locationId),
-        queryFn: () => getLocation(record.locationId),
-      });
-      if (!can(location.role, 'attachments.add')) {
-        setError(t`You don't have permission to do that.`);
-        return;
-      }
-      select(record);
+      await action();
     } catch (cause) {
       setError(explain(cause));
     } finally {
@@ -111,40 +109,97 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
     }
   };
 
-  const save = async (picked?: File) => {
+  const open = async (target: ScanTarget) => {
+    const record = await describeTarget(target, { store: null, online });
+    if (!record) {
+      setError(t`Couldn't load this`);
+      return;
+    }
+    const location = await qc.fetchQuery({
+      queryKey: keys.location(record.locationId),
+      queryFn: () => getLocation(record.locationId),
+    });
+    if (!can(location.role, 'attachments.add')) {
+      setError(t`You don't have permission to do that.`);
+      return;
+    }
+    select(record);
+  };
+
+  const find = (read: Read, typed = false) => {
+    if (
+      working.current ||
+      selected.current ||
+      choice ||
+      (!typed && (manual || read.format !== 'qr_code'))
+    )
+      return;
+    const scan = parseScan(read.text, read.format);
+    const key = scan.kind === 'kept' ? scan.code : read.text;
+    if (!typed && key === lastRead.current) return;
+    setManual(false);
+    void lookUp(async () => {
+      lastRead.current = key;
+      // Write to the label’s current record, even if the phone has an older snapshot.
+      const resolution = await resolveScan(read, { store: null, online });
+      switch (resolution.outcome) {
+        case 'open':
+          await open(resolution.target);
+          return;
+        case 'claim':
+        case 'legacy_ambiguous':
+          setChoice(resolution);
+          return;
+        case 'not_on_phone':
+          setError(t`Needs a connection`);
+          return;
+        default:
+          setUnmatched({
+            code: resolution.outcome === 'not_in_your_kept' ? resolution.code : null,
+          });
+      }
+    });
+  };
+
+  const pickTarget = (target: ScanTarget) => {
+    setChoice(null);
+    void lookUp(() => open(target));
+  };
+
+  const save = async (picked: File[] = []) => {
     const record = selected.current;
     if (working.current || !record || !online) return;
     working.current = true;
     setStep('save');
     setError(undefined);
+    let uploaded = false;
     try {
-      let photo = shot;
-      if (!photo) {
-        let file = picked;
-        if (!file && video.current) {
+      let queue = pending;
+      if (!queue.length) {
+        let files = picked;
+        if (!files.length && video.current) {
           const image = await grabFrame(video.current, 'thing').catch(() => null);
-          if (image) file = new File([image.original], 'photo.jpg', { type: image.original.type });
+          if (image)
+            files = [new File([image.original], 'photo.jpg', { type: image.original.type })];
         }
-        if (!file) {
+        if (!files.length) {
           setError(t`Couldn't read the photo`);
           return;
         }
-        photo = { file, fileId: newId(), attachmentId: newId() };
-        setShot(photo);
+        queue = files.map((file) => ({ file, fileId: newId(), attachmentId: newId() }));
+        setPending(queue);
       }
-      await uploadAndAttach({
-        ...photo,
-        locationId: record.locationId,
-        subject: record.kind === 'place' ? { placeId: record.id } : { thingId: record.id },
-        role: 'photo',
-      });
-      void invalidate(record.kind === 'thing' ? record.id : undefined);
-      setShot(null);
-      select(null);
-      setSaved(true);
+      const subject = record.kind === 'place' ? { placeId: record.id } : { thingId: record.id };
+      for (const photo of queue) {
+        await uploadAndAttach({ ...photo, locationId: record.locationId, subject, role: 'photo' });
+        uploaded = true;
+        setPending((rest) => rest.slice(1));
+        setSaved((count) => count + 1);
+      }
     } catch (cause) {
       setError(explainUpload(cause));
     } finally {
+      if (uploaded) void invalidate(record.kind === 'thing' ? record.id : undefined);
       working.current = false;
       setStep(null);
     }
@@ -155,7 +210,7 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
     if (
       shot &&
       !(await confirm({
-        title: t`Discard this photo?`,
+        title: pending.length > 1 ? t`Discard these photos?` : t`Discard this photo?`,
         confirmLabel: t`Discard`,
         destructive: true,
       }))
@@ -170,10 +225,10 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
       ? t`Looking it up…`
       : step === 'save'
         ? t`Saving…`
-        : target
-          ? null
-          : saved
-            ? t`Photo added. Scan the next label.`
+        : target && saved
+          ? plural(saved, { one: '# photo added', other: '# photos added' })
+          : target || unmatched
+            ? null
             : t`Scan a label`;
 
   return (
@@ -197,8 +252,8 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
       <div className="relative mx-3 min-h-[220px] flex-1 overflow-hidden rounded-[14px] bg-[#1C1A17]">
         <ScannerView
           detect={appDetect()}
-          paused={!!target || !!step || manual || !online}
-          onRead={(read) => void find(read)}
+          paused={!!target || !!step || !!choice || !!unmatched || manual || !online}
+          onRead={find}
           videoRef={video}
           onFrameReady={setFrameReady}
           photographing={!!target}
@@ -224,6 +279,14 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
           {status ? <p className="m-0 text-small text-ink-2">{status}</p> : null}
         </div>
         {error ? <Notice tone="danger">{error}</Notice> : null}
+        {unmatched ? (
+          <Notice tone="info">
+            <div className="flex flex-wrap items-center gap-2">
+              <Trans>Not in your Kept</Trans>
+              {unmatched.code ? <IdChip code={unmatched.code} /> : null}
+            </div>
+          </Notice>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {target ? (
             shot ? (
@@ -241,7 +304,7 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
                   className="min-h-11"
                   isDisabled={!!step}
                   onPress={() => {
-                    setShot(null);
+                    setPending([]);
                     setError(undefined);
                   }}
                 >
@@ -263,20 +326,20 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
                   <FilePick
                     camera
                     className={cn(buttonClass(), 'min-h-11 data-focus-visible:outline-info')}
-                    onFiles={([file]) => void save(file)}
+                    onFiles={(files) => void save(files)}
                   >
                     <CameraIcon className="size-4" />
                     <Trans>Take a photo</Trans>
                   </FilePick>
                 ) : null}
                 {online && !step ? (
-                  <FilePick className={fileButton} onFiles={([file]) => void save(file)}>
+                  <FilePick multiple className={fileButton} onFiles={(files) => void save(files)}>
                     <GalleryIcon className="size-4" />
                     <Trans>Gallery</Trans>
                   </FilePick>
                 ) : null}
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   className="min-h-11"
                   isDisabled={!!step}
                   onPress={() => {
@@ -284,7 +347,8 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
                     setError(undefined);
                   }}
                 >
-                  <Trans>Skip</Trans>
+                  <QrIcon className="size-4" />
+                  <Trans>Scan next label</Trans>
                 </Button>
               </>
             )
@@ -298,13 +362,19 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
               >
                 <Trans>Type the code</Trans>
               </Button>
-              {error && online && !step ? (
+              {unmatched && online && !step ? (
+                <Button className="min-h-11" onPress={() => setChoice({ outcome: 'pick' })}>
+                  <Trans>Choose a thing or place</Trans>
+                </Button>
+              ) : null}
+              {(error || unmatched) && online && !step ? (
                 <Button
                   variant="ghost"
                   className="min-h-11"
                   onPress={() => {
                     lastRead.current = null;
                     setError(undefined);
+                    setUnmatched(null);
                   }}
                 >
                   <Trans>Scan again</Trans>
@@ -317,9 +387,45 @@ export function ScanPhotos({ onExit }: { onExit: () => void }) {
       <Sheet isOpen={manual} onOpenChange={setManual} title={t`Type the code`}>
         <ManualCode
           onCancel={() => setManual(false)}
-          onCode={(code) => void find({ text: code }, true)}
+          onCode={(code) => find({ text: code }, true)}
         />
       </Sheet>
+      <Sheet
+        isOpen={!!choice && choice.outcome !== 'create'}
+        onOpenChange={(open) => !open && setChoice(null)}
+        title={choice?.outcome === 'pick' ? t`Choose a thing or place` : t`Scan result`}
+      >
+        {choice?.outcome === 'claim' ? (
+          <ClaimSheet
+            key={choice.code}
+            code={choice.code}
+            locationId={choice.locationId}
+            store={store}
+            online={online}
+            onCamera={false}
+            onOpen={pickTarget}
+            onAgain={() => setChoice(null)}
+            onQueued={onQueued}
+          />
+        ) : choice?.outcome === 'legacy_ambiguous' ? (
+          <LegacyPicker candidates={choice.candidates} onOpen={pickTarget} />
+        ) : choice?.outcome === 'pick' ? (
+          <PhotoTargetPicker
+            onPick={pickTarget}
+            onCreate={(locationId, box) => setChoice({ outcome: 'create', locationId, box })}
+          />
+        ) : null}
+      </Sheet>
+      {choice?.outcome === 'create' ? (
+        <CreateThingSheet
+          isOpen
+          locationId={choice.locationId}
+          onClose={() => setChoice({ outcome: 'pick' })}
+          onCreated={(thing) => pickTarget({ kind: 'thing', ...thing })}
+          openAfter={false}
+          {...(choice.box ? { title: t`Add a box`, presetType: 'box_bin' } : {})}
+        />
+      ) : null}
     </div>
   );
 }

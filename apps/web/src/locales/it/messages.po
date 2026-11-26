@@ -29487,13 +29487,17 @@ msgid "Scan and photograph"
 msgstr "Scansiona e fotografa"
 
 #: src/components/scan/scan-photos.tsx
-msgid "Scan a label already assigned to a thing or place."
-msgstr "Scansiona un’etichetta già assegnata a un oggetto o a un luogo."
-
-#: src/components/scan/scan-photos.tsx
 msgid "Discard this photo?"
 msgstr "Scartare questa foto?"
 
 #: src/components/scan/scan-photos.tsx
-msgid "Photo added. Scan the next label."
-msgstr "Foto aggiunta. Scansiona l’etichetta successiva."
+msgid "Choose a thing or place"
+msgstr "Scegli un oggetto o un luogo"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Scan next label"
+msgstr "Scansiona l’etichetta successiva"
+
+#: src/components/scan/scan-photos.tsx
+msgid "{saved, plural, one {# photo added} other {# photos added}}"
+msgstr "{saved, plural, one {# foto aggiunta} other {# foto aggiunte}}"

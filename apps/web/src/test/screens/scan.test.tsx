@@ -5,6 +5,7 @@
  */
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { capturePaths } from '@/api/capture/paths';
 import { INV_IDS } from '@/api/inventory/mock/fixtures';
 import { inventoryPaths } from '@/api/inventory/paths';
 import { PASS, reply } from '@/api/mock/kit';
@@ -14,12 +15,12 @@ import { findHeading, pathOf, renderApp } from '../app';
 const T = INV_IDS.thing;
 
 describe('scan entry points', () => {
-  it('adds photos to successive labels from Home and retries a failed attachment with the same key', async () => {
+  it('adds several photos to one label and moves on only after Scan next label', async () => {
     let attempts = 0;
     const { user, mock, router } = await renderApp('/', {
       setup(mock) {
         mock.on('POST', inventoryPaths.attachments, () =>
-          ++attempts === 1 ? reply(503, { code: 'internal', error: 'Try again' }) : PASS,
+          ++attempts === 2 ? reply(503, { code: 'internal', error: 'Try again' }) : PASS,
         );
       },
     });
@@ -34,12 +35,17 @@ describe('scan entry points', () => {
       await user.click(form.getByRole('button', { name: 'Find' }));
       expect(await findHeading(name)).toBeInTheDocument();
     };
-    const pickPhoto = async () => {
+    const pickPhotos = async (...numbers: number[]) => {
       await screen.findByRole('button', { name: 'Gallery' });
       const input = document.querySelector<HTMLInputElement>('input[type="file"]:not([capture])');
       if (!input) throw new Error('Missing photo picker');
-      const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
-      await user.upload(input, new File([bytes], 'photo.jpg', { type: 'image/jpeg' }));
+      const files = numbers.map(
+        (n) =>
+          new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, n])], `photo-${n}.jpg`, {
+            type: 'image/jpeg',
+          }),
+      );
+      await user.upload(input, files);
     };
     const writes = () =>
       mock.calls.filter(
@@ -47,28 +53,100 @@ describe('scan entry points', () => {
       );
 
     await typeCode('B0X3QF', 'Cable box');
-    await pickPhoto();
+    await pickPhotos(1, 2, 3);
+    expect(await screen.findByText('1 photo added')).toBeInTheDocument();
     expect(await screen.findByRole('img', { name: 'Cable box' })).toBeInTheDocument();
     await screen.findByText(/The server is busy making previews/);
+    expect(writes()).toHaveLength(2);
     const retry = await screen.findByRole('button', { name: 'Try again' });
     await user.click(retry);
-    expect(await screen.findByText('Photo added. Scan the next label.')).toBeInTheDocument();
-    expect(writes()).toHaveLength(2);
-    expect(writes()[0]?.headers['idempotency-key']).toBeTruthy();
-    expect(writes()[1]?.headers['idempotency-key']).toBe(writes()[0]?.headers['idempotency-key']);
-    expect(writes()[1]?.body).toEqual(writes()[0]?.body);
-    expect(writes()[1]?.body).toMatchObject({ role: 'photo', subject: { thingId: T.cableBox } });
+    expect(await screen.findByText('3 photos added')).toBeInTheDocument();
+    expect(writes()).toHaveLength(4);
+    expect(writes()[1]?.headers['idempotency-key']).toBeTruthy();
+    expect(writes()[2]?.headers['idempotency-key']).toBe(writes()[1]?.headers['idempotency-key']);
+    expect(writes()[2]?.body).toEqual(writes()[1]?.body);
+    for (const write of writes()) {
+      expect(write.body).toMatchObject({ role: 'photo', subject: { thingId: T.cableBox } });
+    }
+    expect(screen.getByRole('heading', { name: 'Cable box' })).toBeInTheDocument();
 
+    await user.click(screen.getByRole('button', { name: 'Scan next label' }));
     await typeCode('R00M4K', 'Office');
-    await pickPhoto();
-    expect(await screen.findByText('Photo added. Scan the next label.')).toBeInTheDocument();
-    expect(writes()).toHaveLength(3);
-    expect(writes()[2]?.body).toMatchObject({
+    await pickPhotos(4);
+    expect(await screen.findByText('1 photo added')).toBeInTheDocument();
+    expect(writes()).toHaveLength(5);
+    expect(writes()[4]?.body).toMatchObject({
       role: 'photo',
       subject: { placeId: INV_IDS.place.office },
     });
     await user.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(pathOf(router)).toBe('/'));
+  });
+
+  it('lets an unmatched QR choose a record and a blank label be assigned from the photo screen', async () => {
+    const { user, mock } = await renderApp('/scan?photos=1');
+    const typeCode = async (code: string) => {
+      await user.click(await screen.findByRole('button', { name: 'Type the code' }));
+      const dialog = within(await screen.findByRole('dialog', { name: 'Type the code' }));
+      await user.type(dialog.getByRole('textbox', { name: 'Code on the label' }), code);
+      await user.click(dialog.getByRole('button', { name: 'Find' }));
+    };
+    await typeCode('ZZZ111');
+    expect(await screen.findByText('Not in your Kept')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Choose a thing or place' }));
+    const chooser = within(await screen.findByRole('dialog', { name: 'Choose a thing or place' }));
+    await user.type(chooser.getByRole('searchbox', { name: 'Search by code or name' }), 'Office');
+    await user.click(await chooser.findByRole('button', { name: /^Office/ }));
+    expect(await findHeading('Office')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Scan next label' }));
+
+    await typeCode('B7NK4X');
+    expect(await findHeading('Claim this label')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Attach to an existing thing/ }));
+    await user.type(await screen.findByRole('searchbox', { name: 'Search' }), 'Cable box');
+    await user.click(await screen.findByRole('button', { name: /^Cable box/ }));
+    expect(await findHeading('Cable box')).toBeInTheDocument();
+    expect(mock.lastCall('POST', capturePaths.codeClaim('B7NK4X'))?.body).toEqual({
+      thingId: T.cableBox,
+    });
+    expect(await screen.findByRole('button', { name: 'Gallery' })).toBeEnabled();
+  });
+
+  it('creates a box for an unmatched QR and attaches photos without leaving the scanner', async () => {
+    const { user, mock, router } = await renderApp('/scan?photos=1');
+    await user.click(await screen.findByRole('button', { name: 'Type the code' }));
+    const manual = within(await screen.findByRole('dialog', { name: 'Type the code' }));
+    await user.type(manual.getByRole('textbox', { name: 'Code on the label' }), 'ZZZ111');
+    await user.click(manual.getByRole('button', { name: 'Find' }));
+    await user.click(await screen.findByRole('button', { name: 'Choose a thing or place' }));
+    await user.click(await screen.findByRole('button', { name: 'Add a box' }));
+    const form = within(await screen.findByRole('dialog', { name: 'Add a box' }));
+    await waitFor(() =>
+      expect(form.getByRole('combobox', { name: 'Type' })).toHaveValue('Box / bin'),
+    );
+    await user.type(form.getByRole('textbox', { name: 'Name' }), 'New storage box');
+    const place = form.getByRole('combobox', { name: 'Where it is' });
+    await waitFor(() => expect(place).toBeEnabled());
+    await user.type(place, 'Unplaced');
+    await user.click(await screen.findByRole('option', { name: 'Unplaced' }));
+    await user.click(form.getByRole('button', { name: 'Add' }));
+
+    expect(await findHeading('New storage box')).toBeInTheDocument();
+    expect(pathOf(router)).toBe('/scan');
+    await screen.findByRole('button', { name: 'Gallery' });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]:not([capture])');
+    if (!input) throw new Error('Missing photo picker');
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], 'box.jpg', {
+      type: 'image/jpeg',
+    });
+    await user.upload(input, file);
+    expect(await screen.findByText('1 photo added')).toBeInTheDocument();
+    const create = mock.lastCall('POST', inventoryPaths.things)?.body as { id: string };
+    expect(create).toMatchObject({ name: 'New storage box', id: expect.any(String) });
+    expect(mock.lastCall('POST', inventoryPaths.attachments)?.body).toMatchObject({
+      subject: { thingId: create.id },
+      role: 'photo',
+    });
   });
 
   it('/l/<code> opens the box it is on, leading with its photos, and marks it seen', async () => {

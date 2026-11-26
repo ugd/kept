@@ -62,7 +62,7 @@ function ScanPage() {
     },
     [navigate, store, qc],
   );
-  if (photos === 1) return <ScanPhotos onExit={exit} />;
+  if (photos === 1) return <ScanPhotos store={store} onQueued={kick} onExit={exit} />;
   if (!store)
     return (
       <div

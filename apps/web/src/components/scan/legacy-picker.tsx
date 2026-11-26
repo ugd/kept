@@ -13,7 +13,7 @@ export function LegacyPicker({
   candidates,
   onOpen,
 }: {
-  legacy: string;
+  legacy?: string;
   candidates: readonly LegacyCandidate[];
   /** Opens the one chosen. The server candidates carry no location id; the page finds it. */
   onOpen: (target: ScanTarget) => void;
@@ -24,14 +24,16 @@ export function LegacyPicker({
       <h2 className="m-0 font-semibold text-[19px]">
         <Trans>Which one is it?</Trans>
       </h2>
-      <p className="m-0 text-ink-2">
-        <Trans>
-          <bdi dir="ltr" className="font-mono">
-            Asset {legacy}
-          </bdi>{' '}
-          is on more than one thing you brought from Homebox. Pick the one in your hands.
-        </Trans>
-      </p>
+      {legacy !== undefined ? (
+        <p className="m-0 text-ink-2">
+          <Trans>
+            <bdi dir="ltr" className="font-mono">
+              Asset {legacy}
+            </bdi>{' '}
+            is on more than one thing you brought from Homebox. Pick the one in your hands.
+          </Trans>
+        </p>
+      ) : null}
       <ul aria-label={t`Things with this label`} className="m-0 grid list-none gap-1.5 p-0">
         {candidates.map((c) => (
           <li key={`${c.kind}:${c.id}`}>
