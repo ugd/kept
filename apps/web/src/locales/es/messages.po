@@ -29480,3 +29480,20 @@ msgstr "La impresión se detuvo antes de terminar todas las etiquetas."
 #: src/components/labels/server-print.tsx
 msgid "The printer finished all labels."
 msgstr "La impresora terminó de imprimir todas las etiquetas."
+
+#: src/components/home/shortcuts.tsx
+#: src/components/scan/scan-photos.tsx
+msgid "Scan and photograph"
+msgstr "Escanear y fotografiar"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Scan a label already assigned to a thing or place."
+msgstr "Escanea una etiqueta ya asignada a un objeto o lugar."
+
+#: src/components/scan/scan-photos.tsx
+msgid "Discard this photo?"
+msgstr "¿Descartar esta foto?"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Photo added. Scan the next label."
+msgstr "Foto añadida. Escanea la siguiente etiqueta."

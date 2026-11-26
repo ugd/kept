@@ -160,22 +160,29 @@ export async function uploadAndAttach({
   subject,
   role,
   name,
+  attachmentId,
   ...input
 }: UploadInput & {
   subject: AttachmentSubject;
   role: AttachmentRole;
   /** #183: what it is called; a document keeps its own file name. */
   name?: string;
+  /** Reuse on retry when the response to attachment creation may have been lost. */
+  attachmentId?: string;
 }): Promise<AttachmentView> {
   const file = await putFile(input);
-  return api.post<AttachmentView>(inventoryPaths.attachments, {
-    id: newId(),
-    locationId: input.locationId,
-    fileId: file.id,
-    subject,
-    role,
-    ...(name ? { name } : {}),
-  });
+  return api.post<AttachmentView>(
+    inventoryPaths.attachments,
+    {
+      id: attachmentId ?? newId(),
+      locationId: input.locationId,
+      fileId: file.id,
+      subject,
+      role,
+      ...(name ? { name } : {}),
+    },
+    attachmentId ? { 'Idempotency-Key': attachmentId } : undefined,
+  );
 }
 
 /** A picked file's name without its extension ("Insurance 2026.pdf" → "Insurance 2026"). */

@@ -29480,3 +29480,20 @@ msgstr "Der Druck wurde angehalten, bevor alle Etiketten fertig waren."
 #: src/components/labels/server-print.tsx
 msgid "The printer finished all labels."
 msgstr "Der Drucker hat alle Etiketten gedruckt."
+
+#: src/components/home/shortcuts.tsx
+#: src/components/scan/scan-photos.tsx
+msgid "Scan and photograph"
+msgstr "Scannen und fotografieren"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Scan a label already assigned to a thing or place."
+msgstr "Scanne ein Etikett, das bereits einem Gegenstand oder Ort zugewiesen ist."
+
+#: src/components/scan/scan-photos.tsx
+msgid "Discard this photo?"
+msgstr "Dieses Foto verwerfen?"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Photo added. Scan the next label."
+msgstr "Foto hinzugefügt. Scanne das nächste Etikett."

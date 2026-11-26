@@ -91,6 +91,13 @@ export function Shortcuts({
             {tile(<PlusIcon />, <Trans>Add a thing</Trans>)}
           </AriaButton>
         ) : null}
+        <Link
+          to="/scan"
+          search={{ photos: 1 }}
+          className={cn(TILE, PLAIN, 'col-span-full min-h-11 flex-row px-3')}
+        >
+          {tile(<QrIcon />, <Trans>Scan and photograph</Trans>)}
+        </Link>
       </div>
       {adding && addTo ? (
         <CreateThingSheet isOpen locationId={addTo} onClose={() => setAdding(false)} />

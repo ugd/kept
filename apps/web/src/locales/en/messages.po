@@ -29480,3 +29480,20 @@ msgstr "Printing stopped before all labels finished."
 #: src/components/labels/server-print.tsx
 msgid "The printer finished all labels."
 msgstr "The printer finished all labels."
+
+#: src/components/home/shortcuts.tsx
+#: src/components/scan/scan-photos.tsx
+msgid "Scan and photograph"
+msgstr "Scan and photograph"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Scan a label already assigned to a thing or place."
+msgstr "Scan a label already assigned to a thing or place."
+
+#: src/components/scan/scan-photos.tsx
+msgid "Discard this photo?"
+msgstr "Discard this photo?"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Photo added. Scan the next label."
+msgstr "Photo added. Scan the next label."

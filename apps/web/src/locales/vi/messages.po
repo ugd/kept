@@ -21528,3 +21528,20 @@ msgstr "Quá trình in đã dừng trước khi in hết nhãn."
 #: src/components/labels/server-print.tsx
 msgid "The printer finished all labels."
 msgstr "Máy in đã in xong tất cả nhãn."
+
+#: src/components/home/shortcuts.tsx
+#: src/components/scan/scan-photos.tsx
+msgid "Scan and photograph"
+msgstr "Quét mã và chụp ảnh"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Scan a label already assigned to a thing or place."
+msgstr "Quét nhãn đã gắn với một đồ vật hoặc địa điểm."
+
+#: src/components/scan/scan-photos.tsx
+msgid "Discard this photo?"
+msgstr "Bỏ ảnh này?"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Photo added. Scan the next label."
+msgstr "Đã thêm ảnh. Quét nhãn tiếp theo."

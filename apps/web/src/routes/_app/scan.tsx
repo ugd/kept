@@ -12,15 +12,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { openSearch, type ScanTarget } from '@/components/scan/resolve';
+import { ScanPhotos } from '@/components/scan/scan-photos';
 import { ScanScreen } from '@/components/scan/scan-screen';
 import { useSessionPersist } from '@/components/scan/session/use-persist';
 import { useKick, useScanStore } from '@/components/scan/use-scan-store';
 
 export const Route = createFileRoute('/_app/scan')({
-  validateSearch: (s: Record<string, unknown>): { tray?: 1; unpack?: string; place?: string } => {
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { tray?: 1; unpack?: string; place?: string; photos?: 1 } => {
     const id = (v: unknown) => typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v);
     if (id(s.unpack)) return { unpack: s.unpack as string };
     if (id(s.place)) return { place: s.place as string };
+    if (s.photos === 1 || s.photos === '1') return { photos: 1 };
     return s.tray === 1 || s.tray === '1' ? { tray: 1 } : {};
   },
   component: ScanPage,
@@ -28,7 +32,7 @@ export const Route = createFileRoute('/_app/scan')({
 
 function ScanPage() {
   const { t } = useLingui();
-  const { tray, unpack, place } = Route.useSearch();
+  const { tray, unpack, place, photos } = Route.useSearch();
   const store = useScanStore();
   const kick = useKick();
   const navigate = useNavigate();
@@ -58,6 +62,7 @@ function ScanPage() {
     },
     [navigate, store, qc],
   );
+  if (photos === 1) return <ScanPhotos onExit={exit} />;
   if (!store)
     return (
       <div

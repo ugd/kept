@@ -199,7 +199,7 @@ describe('Home', () => {
     expectLogicalOnly();
   });
 
-  it('day one: the welcome, the steps after it, the Personal card, three shortcuts and an empty Recent', async () => {
+  it('day one: the welcome, the steps after it, the Personal card, shortcuts and an empty Recent', async () => {
     const { user } = await renderApp('/', { state: firstRunScenario() });
     expect(await findHeading('Welcome, Ibrahim')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Create your first home/ })).toHaveAttribute(
@@ -217,6 +217,7 @@ describe('Home', () => {
       'Capture',
       'Scan a label',
       'Add a thing',
+      'Scan and photograph',
     ]);
     const recent = await section('Recent activity');
     expect(
@@ -710,7 +711,7 @@ describe('Home: the household counts', () => {
 });
 
 describe('Home: shortcuts and Insights', () => {
-  it('Capture, Scan a label, Log a reading and Add a thing', async () => {
+  it('shows capture, scan, reading, add and scan-photo shortcuts', async () => {
     // A metered car (step 5's fixtures) puts Log a reading among them.
     const state = ownerScenario();
     ensureVehiclesSeeded(state);
@@ -722,6 +723,7 @@ describe('Home: shortcuts and Insights', () => {
         'Scan a label',
         'Log a reading',
         'Add a thing',
+        'Scan and photograph',
       ]),
     );
     expect(within(shortcuts).getByRole('link', { name: 'Capture' })).toHaveAttribute(
@@ -731,6 +733,10 @@ describe('Home: shortcuts and Insights', () => {
     expect(within(shortcuts).getByRole('link', { name: 'Scan a label' })).toHaveAttribute(
       'href',
       '/scan',
+    );
+    expect(within(shortcuts).getByRole('link', { name: 'Scan and photograph' })).toHaveAttribute(
+      'href',
+      '/scan?photos=1',
     );
     await user.click(within(shortcuts).getByRole('button', { name: 'Add a thing' }));
     expect(await screen.findByRole('dialog', { name: 'Add a thing' })).toBeInTheDocument();

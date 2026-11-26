@@ -31463,3 +31463,20 @@ msgstr "Друк зупинився до завершення всієї пар�
 #: src/components/labels/server-print.tsx
 msgid "The printer finished all labels."
 msgstr "Принтер надрукував усі етикетки."
+
+#: src/components/home/shortcuts.tsx
+#: src/components/scan/scan-photos.tsx
+msgid "Scan and photograph"
+msgstr "Сканувати й фотографувати"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Scan a label already assigned to a thing or place."
+msgstr "Відскануйте етикетку, яку вже призначено предмету чи місцю."
+
+#: src/components/scan/scan-photos.tsx
+msgid "Discard this photo?"
+msgstr "Відхилити це фото?"
+
+#: src/components/scan/scan-photos.tsx
+msgid "Photo added. Scan the next label."
+msgstr "Фото додано. Відскануйте наступну етикетку."

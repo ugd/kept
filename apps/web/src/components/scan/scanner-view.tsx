@@ -11,8 +11,9 @@
  * "Try again", which opens the camera and the decoder afresh (#486).
  */
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-aria-components';
+import { hasFrame } from '@/camera/grab';
 import type { Detect, Detected } from '@/camera/label-recogniser';
 import { buzz, startScanLoop } from '@/camera/scanner';
 import { type CameraEnv, type CameraProblem, cameraEnv, openCamera } from '@/camera/session';
@@ -40,6 +41,9 @@ export function ScannerView({
   onProblem,
   onRetry,
   camera,
+  videoRef,
+  onFrameReady,
+  photographing = false,
   now = () => Date.now(),
 }: {
   detect: Detect | null;
@@ -50,10 +54,15 @@ export function ScannerView({
   /** "Try again" was pressed: the camera and the decoder are starting afresh. */
   onRetry?: () => void;
   camera?: CameraEnv;
+  /** Let the photo workflow take a frame from the same stream. */
+  videoRef?: RefObject<HTMLVideoElement | null>;
+  onFrameReady?: (ready: boolean) => void;
+  photographing?: boolean;
   now?: () => number;
 }) {
   const { t } = useLingui();
-  const video = useRef<HTMLVideoElement>(null);
+  const ownVideo = useRef<HTMLVideoElement>(null);
+  const video = videoRef ?? ownVideo;
   const [cam, setCam] = useState<Cam>({ state: 'opening' });
   const [attempt, setAttempt] = useState(0);
   const stopRef = useRef<(() => void) | null>(null);
@@ -91,10 +100,22 @@ export function ScannerView({
 
   useEffect(() => {
     const v = video.current;
-    if (!v || cam.state !== 'live') return;
+    if (!v || cam.state !== 'live') {
+      onFrameReady?.(false);
+      return;
+    }
     v.srcObject = cam.stream;
     void v.play?.()?.catch(() => {});
-  }, [cam]);
+    if (!onFrameReady) return;
+    const check = () => onFrameReady(hasFrame(v));
+    check();
+    v.addEventListener('loadeddata', check);
+    v.addEventListener('resize', check);
+    return () => {
+      v.removeEventListener('loadeddata', check);
+      v.removeEventListener('resize', check);
+    };
+  }, [cam, onFrameReady, video]);
 
   useEffect(() => {
     const v = video.current;
@@ -130,7 +151,7 @@ export function ScannerView({
       },
       { onUnavailable: (e) => noScanner(e?.cause ?? e) },
     );
-  }, [cam, detect, paused, now]);
+  }, [cam, detect, paused, now, video]);
 
   if (cam.state === 'problem') {
     const p = cam.problem;
@@ -166,9 +187,11 @@ export function ScannerView({
             <Trans>Try again</Trans>
           </Button>
         ) : null}
-        <p className="m-0 text-[#BDB7AC] text-[14px]">
-          <Trans>Type the code printed under the QR code instead.</Trans>
-        </p>
+        {!photographing ? (
+          <p className="m-0 text-[#BDB7AC] text-[14px]">
+            <Trans>Type the code printed under the QR code instead.</Trans>
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -183,7 +206,7 @@ export function ScannerView({
         aria-label={t`Camera view`}
         className="absolute inset-0 size-full object-cover"
       />
-      <Viewfinder />
+      {!photographing ? <Viewfinder /> : null}
     </>
   );
 }
